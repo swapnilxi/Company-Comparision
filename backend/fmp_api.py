@@ -44,6 +44,18 @@ class FMPAPI:
         """Get real-time stock quote"""
         return self._make_request(f"quote/{ticker}")
     
+    def get_realtime_price(self, ticker: str) -> Dict[str, Any]:
+        """Get lightweight real-time price (price and volume)"""
+        return self._make_request(f"quote-short/{ticker}")
+    
+    def get_realtime_prices(self, tickers: List[str]) -> Any:
+        """Get real-time quotes for multiple tickers"""
+        if not tickers:
+            return []
+        tickers_param = ",".join(tickers)
+        # FMP supports comma-separated tickers in quote endpoint
+        return self._make_request(f"quote/{tickers_param}")
+    
     def get_financial_ratios(self, ticker: str) -> Dict[str, Any]:
         """Get key financial ratios"""
         return self._make_request(f"ratios/{ticker}")

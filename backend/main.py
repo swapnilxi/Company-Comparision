@@ -40,6 +40,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Realtime market data endpoints (FMP)
+@app.get("/api/market/quote/{ticker}", tags=["market"])
+async def get_realtime_quote(ticker: str = Path(..., description="Stock ticker symbol, e.g., AAPL")):
+    """Get real-time quote for a single ticker using FMP"""
+    data = fmp_client.get_company_quote(ticker)
+    # FMP returns a list for quote endpoints; normalize to single object when possible
+    if isinstance(data, list):
+        if not data:
+            raise HTTPException(status_code=404, detail=f"Quote not found for {ticker}")
+        data = data[0]
+    if isinstance(data, dict) and data.get("error"):
+        raise HTTPException(status_code=502, detail=data["error"]) 
+    return data
+
+@app.get("/api/market/price/{ticker}", tags=["market"])
+async def get_realtime_price(ticker: str = Path(..., description="Stock ticker symbol, e.g., AAPL")):
+    """Get lightweight real-time price for a single ticker using FMP"""
+    data = fmp_client.get_realtime_price(ticker)
+    if isinstance(data, list):
+        if not data:
+            raise HTTPException(status_code=404, detail=f"Price not found for {ticker}")
+        data = data[0]
+    if isinstance(data, dict) and data.get("error"):
+        raise HTTPException(status_code=502, detail=data["error"]) 
+    return data
+
+@app.get("/api/market/quotes", tags=["market"])
+async def get_realtime_quotes(tickers: List[str] = Query(..., description="Tickers as repeated params (?tickers=AAPL&tickers=MSFT) or a single comma-separated value")):
+    """Get real-time quotes for multiple tickers using FMP"""
+    # Support both repeated params and comma-separated inside a single item
+    if isinstance(tickers, list) and len(tickers) == 1 and "," in tickers[0]:
+        tickers = [t.strip() for t in tickers[0].split(",") if t.strip()]
+    data = fmp_client.get_realtime_prices(tickers)
+    if isinstance(data, dict) and data.get("error"):
+        raise HTTPException(status_code=502, detail=data["error"]) 
+    if isinstance(tickers, list) and not data:
+        raise HTTPException(status_code=404, detail="No quotes found for provided tickers")
+    return data
+
 # Root endpoint
 @app.get("/")
 async def read_root():
@@ -136,40 +175,23 @@ async def compare(
 async def analyze_company(request: CompanyAnalysisRequest):
     """Analyze a company based on name and website"""
     try:
-        # Call DeepSeek API to analyze the company
+        # Call DeepSeek API to analyze the company and return structured output
         analysis_result = deepseek_client.analyze_company(
             company_name=request.name,
             company_website=str(request.website)
         )
-        
-        # Extract industry and business model from the description if possible
-        # This is a simple implementation - in a real app, you might want to use
-        # more sophisticated NLP techniques or another API call
-        description = analysis_result.get("description", "")
-        industry = None
-        business_model = None
-        
-        # Very simple extraction based on keywords
-        if "industry:" in description.lower():
-            industry_start = description.lower().find("industry:") + len("industry:")
-            industry_end = description.find("\n", industry_start)
-            if industry_end == -1:
-                industry_end = len(description)
-            industry = description[industry_start:industry_end].strip()
-        
-        if "business model:" in description.lower():
-            model_start = description.lower().find("business model:") + len("business model:")
-            model_end = description.find("\n", model_start)
-            if model_end == -1:
-                model_end = len(description)
-            business_model = description[model_start:model_end].strip()
-        
+
         return CompanyAnalysisResponse(
             name=request.name,
             website=str(request.website),
-            description=description,
-            industry=industry,
-            business_model=business_model
+            description=analysis_result.get("description", ""),
+            industry=analysis_result.get("industry"),
+            business_model=analysis_result.get("business_model"),
+            products_or_services=analysis_result.get("products_or_services"),
+            target_market=analysis_result.get("target_market"),
+            company_size=analysis_result.get("company_size"),
+            geographic_presence=analysis_result.get("geographic_presence"),
+            key_differentiators=analysis_result.get("key_differentiators")
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analyzing company: {str(e)}")

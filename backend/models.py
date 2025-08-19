@@ -104,6 +104,11 @@ class CompanyAnalysisResponse(BaseModel):
     description: str = Field(..., description="Comprehensive company description")
     industry: Optional[str] = Field(None, description="Identified industry")
     business_model: Optional[str] = Field(None, description="Business model description")
+    products_or_services: Optional[str] = Field(None, description="Key products or services")
+    target_market: Optional[str] = Field(None, description="Primary customer segments")
+    company_size: Optional[str] = Field(None, description="Size or scale of the company")
+    geographic_presence: Optional[str] = Field(None, description="Regions or countries of operation")
+    key_differentiators: Optional[str] = Field(None, description="Core differentiators")
 
     class Config:
         schema_extra = {
@@ -112,7 +117,12 @@ class CompanyAnalysisResponse(BaseModel):
                 "website": "https://techinnovations.example.com",
                 "description": "Tech Innovations Inc. is a leading technology company specializing in AI solutions...",
                 "industry": "Technology",
-                "business_model": "SaaS (Software as a Service)"
+                "business_model": "SaaS (Software as a Service)",
+                "products_or_services": "AI platform, data analytics tools, ML services",
+                "target_market": "Enterprise customers across finance, retail, healthcare",
+                "company_size": "1,000-5,000 employees",
+                "geographic_presence": "North America, Europe",
+                "key_differentiators": "Proprietary AI models; strong enterprise integrations"
             }
         }
 
