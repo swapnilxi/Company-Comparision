@@ -40,192 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Realtime market data endpoints (FMP)
-@app.get("/api/market/quote/{ticker}", tags=["market"])
-async def get_realtime_quote(ticker: str = Path(..., description="Stock ticker symbol, e.g., AAPL")):
-    """Get real-time quote for a single ticker using FMP"""
-    data = fmp_client.get_company_quote(ticker)
-    # FMP returns a list for quote endpoints; normalize to single object when possible
-    if isinstance(data, list):
-        if not data:
-            raise HTTPException(status_code=404, detail=f"Quote not found for {ticker}")
-        data = data[0]
-    if isinstance(data, dict) and data.get("error"):
-        raise HTTPException(status_code=502, detail=data["error"]) 
-    return data
-
-@app.get("/api/market/price/{ticker}", tags=["market"])
-async def get_realtime_price(ticker: str = Path(..., description="Stock ticker symbol, e.g., AAPL")):
-    """Get lightweight real-time price for a single ticker using FMP"""
-    data = fmp_client.get_realtime_price(ticker)
-    if isinstance(data, list):
-        if not data:
-            raise HTTPException(status_code=404, detail=f"Price not found for {ticker}")
-        data = data[0]
-    if isinstance(data, dict) and data.get("error"):
-        raise HTTPException(status_code=502, detail=data["error"]) 
-    return data
-
-@app.get("/api/market/quotes", tags=["market"])
-async def get_realtime_quotes(tickers: List[str] = Query(..., description="Tickers as repeated params (?tickers=AAPL&tickers=MSFT) or a single comma-separated value")):
-    """Get real-time quotes for multiple tickers using FMP"""
-    # Support both repeated params and comma-separated inside a single item
-    if isinstance(tickers, list) and len(tickers) == 1 and "," in tickers[0]:
-        tickers = [t.strip() for t in tickers[0].split(",") if t.strip()]
-    data = fmp_client.get_realtime_prices(tickers)
-    if isinstance(data, dict) and data.get("error"):
-        raise HTTPException(status_code=502, detail=data["error"]) 
-    if isinstance(tickers, list) and not data:
-        raise HTTPException(status_code=404, detail="No quotes found for provided tickers")
-    return data
-
-# Root endpoint
-@app.get("/")
-async def read_root():
-    return {"message": "Welcome to the Company Comparison API"}
-
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
-# Get all companies
-@app.get("/api/companies", response_model=List[Company], tags=["companies"])
-async def get_companies():
-    """Get all companies"""
-    return db.get_all_companies()
-
-# Get a specific company by ID
-@app.get("/api/companies/{company_id}", response_model=Company, tags=["companies"])
-async def get_company(company_id: str = Path(..., description="The ID of the company to retrieve")):
-    """Get a specific company by ID"""
-    company = db.get_company(company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
-    return company
-
-# Create a new company
-@app.post("/api/companies", response_model=Company, status_code=201, tags=["companies"])
-async def create_company(company: CompanyCreate):
-    """Create a new company"""
-    # Generate a simple ID based on the company name
-    company_id = company.name.lower().replace(" ", "_")[:10] + "_" + str(len(db.get_all_companies()) + 1)
-    
-    # Check if company with this ID already exists
-    if db.get_company(company_id):
-        raise HTTPException(status_code=400, detail=f"Company with ID {company_id} already exists")
-    
-    # Create new company object
-    new_company = Company(
-        id=company_id,
-        **company.dict()
-    )
-    
-    # Add to database
-    return db.create_company(company_id, new_company)
-
-# Update a company
-@app.put("/api/companies/{company_id}", response_model=Company, tags=["companies"])
-async def update_company(
-    company_data: Dict[str, Any],
-    company_id: str = Path(..., description="The ID of the company to update")
-):
-    """Update a company"""
-    updated_company = db.update_company(company_id, company_data)
-    if not updated_company:
-        raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
-    return updated_company
-
-# Delete a company
-@app.delete("/api/companies/{company_id}", tags=["companies"])
-async def delete_company(company_id: str = Path(..., description="The ID of the company to delete")):
-    """Delete a company"""
-    success = db.delete_company(company_id)
-    if not success:
-        raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
-    return {"message": f"Company with ID {company_id} deleted successfully"}
-
-# Compare companies
-@app.get("/api/compare", response_model=ComparisonResult, tags=["comparison"])
-async def compare(
-    company_ids: List[str] = Query(..., description="List of company IDs to compare")
-):
-    """Compare multiple companies"""
-    # Check if we have at least 2 companies to compare
-    if len(company_ids) < 2:
-        raise HTTPException(status_code=400, detail="At least two companies are required for comparison")
-    
-    # Get companies from database
-    companies = []
-    for company_id in company_ids:
-        company = db.get_company(company_id)
-        if not company:
-            raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
-        companies.append(company)
-    
-    # Generate comparison
-    try:
-        comparison_result = compare_companies(companies)
-        return comparison_result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error comparing companies: {str(e)}")
-
-# Company Analysis endpoint
-@app.post("/api/analyze", response_model=CompanyAnalysisResponse, tags=["analysis"])
-async def analyze_company(request: CompanyAnalysisRequest):
-    """Analyze a company based on name and website"""
-    try:
-        # Call DeepSeek API to analyze the company and return structured output
-        analysis_result = deepseek_client.analyze_company(
-            company_name=request.name,
-            company_website=str(request.website)
-        )
-
-        return CompanyAnalysisResponse(
-            name=request.name,
-            website=str(request.website),
-            description=analysis_result.get("description", ""),
-            industry=analysis_result.get("industry"),
-            business_model=analysis_result.get("business_model"),
-            products_or_services=analysis_result.get("products_or_services"),
-            target_market=analysis_result.get("target_market"),
-            company_size=analysis_result.get("company_size"),
-            geographic_presence=analysis_result.get("geographic_presence"),
-            key_differentiators=analysis_result.get("key_differentiators")
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error analyzing company: {str(e)}")
-
-# Find comparable companies endpoint
-@app.post("/api/comparable", response_model=ComparableCompaniesResponse, tags=["analysis"])
-async def find_comparable_companies(request: ComparableCompaniesRequest):
-    """Find comparable public companies based on a company description"""
-    try:
-        # Extract target company name from the description
-        # This is a simple implementation - in a real app, you might want to use
-        # more sophisticated techniques
-        target_company = "Unknown Company"
-        if "name:" in request.company_description.lower():
-            name_start = request.company_description.lower().find("name:") + len("name:")
-            name_end = request.company_description.find("\n", name_start)
-            if name_end == -1:
-                name_end = len(request.company_description)
-            target_company = request.company_description[name_start:name_end].strip()
-        
-        # Call DeepSeek API to find comparable companies
-        comparable_companies = deepseek_client.find_comparable_companies(
-            company_description=request.company_description,
-            count=request.count
-        )
-        
-        return ComparableCompaniesResponse(
-            target_company=target_company,
-            comparable_companies=comparable_companies
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error finding comparable companies: {str(e)}")
-
-# NEW: Combined endpoint for company analysis and comparable companies (Core Requirements)
+# Core endpoints (as per API documentation)
 @app.post("/api/find-comparables", tags=["analysis"])
 async def find_comparables_from_input(
     company_id: Optional[str] = Body(None, embed=True, description="Company ID from database"),
@@ -333,10 +148,63 @@ async def find_comparables_from_input(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
-# NEW: Financial Metrics Integration (Extension 1)
+@app.post("/api/analyze", response_model=CompanyAnalysisResponse, tags=["analysis"])
+async def analyze_company(request: CompanyAnalysisRequest):
+    """Analyze a company based on name and website"""
+    try:
+        # Call DeepSeek API to analyze the company and return structured output
+        analysis_result = deepseek_client.analyze_company(
+            company_name=request.name,
+            company_website=str(request.website)
+        )
+
+        return CompanyAnalysisResponse(
+            name=request.name,
+            website=str(request.website),
+            description=analysis_result.get("description", ""),
+            industry=analysis_result.get("industry"),
+            business_model=analysis_result.get("business_model"),
+            products_or_services=analysis_result.get("products_or_services"),
+            target_market=analysis_result.get("target_market"),
+            company_size=analysis_result.get("company_size"),
+            geographic_presence=analysis_result.get("geographic_presence"),
+            key_differentiators=analysis_result.get("key_differentiators")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing company: {str(e)}")
+
+@app.post("/api/comparable", response_model=ComparableCompaniesResponse, tags=["analysis"])
+async def find_comparable_companies(request: ComparableCompaniesRequest):
+    """Find comparable public companies based on a company description"""
+    try:
+        # Extract target company name from the description
+        # This is a simple implementation - in a real app, you might want to use
+        # more sophisticated techniques
+        target_company = "Unknown Company"
+        if "name:" in request.company_description.lower():
+            name_start = request.company_description.lower().find("name:") + len("name:")
+            name_end = request.company_description.find("\n", name_start)
+            if name_end == -1:
+                name_end = len(request.company_description)
+            target_company = request.company_description[name_start:name_end].strip()
+        
+        # Call DeepSeek API to find comparable companies
+        comparable_companies = deepseek_client.find_comparable_companies(
+            company_description=request.company_description,
+            count=request.count
+        )
+        
+        return ComparableCompaniesResponse(
+            target_company=target_company,
+            comparable_companies=comparable_companies
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error finding comparable companies: {str(e)}")
+
+# Extension endpoints
 @app.post("/api/comparables-with-financials", tags=["analysis", "financials"])
 async def find_comparables_with_financials(
-    company_id: Optional[str] = Body(None, embed=True, description="Company ID from database"),
+    company_id: Optional[str] = Body(None, embed=True, description="(Ignored) Company ID from database"),
     company_name: Optional[str] = Body(None, embed=True, description="Company name"),
     company_website: Optional[str] = Body(None, embed=True, description="Company website URL"),
     include_financials: bool = Body(True, embed=True, description="Whether to include financial metrics"),
@@ -345,33 +213,21 @@ async def find_comparables_with_financials(
     """
     Extension 1: Find comparable companies with financial metrics integration.
     
-    This endpoint accepts flexible input:
-    - company_id: Use existing company from database
+    This endpoint accepts flexible input (Database is NOT used):
     - company_name: Analyze company by name (works with or without website)
     - company_website: Analyze company by website (works with or without name)
     
     This endpoint includes:
-    - Company analysis and comparable identification
-    - Financial metrics (market cap, EBITDA, revenue) for each comparable company
-    - Integration with FMP API for real financial data
+    - Company analysis and comparable identification using DeepSeek API
+    - Financial metrics (market cap, EBITDA, revenue) for each comparable company via FMP API
     """
     try:
         target_company_name = None
         target_company_website = None
         company_description = ""
         
-        # Case 1: Company ID provided - get from database
-        if company_id:
-            company = db.get_company(company_id)
-            if not company:
-                raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
-            
-            target_company_name = company.name
-            target_company_website = f"https://{company.name.lower().replace(' ', '')}.com"  # Placeholder
-            company_description = company.description or f"{company.name} is a {company.industry} company founded in {company.founded_year}."
-        
-        # Case 2: Company name and website provided
-        elif company_name and company_website:
+        # Case 1: Company name and website provided
+        if company_name and company_website:
             target_company_name = company_name
             target_company_website = company_website
             
@@ -382,7 +238,7 @@ async def find_comparables_with_financials(
             )
             company_description = analysis_result.get("description", "")
         
-        # Case 3: Only company name provided
+        # Case 2: Only company name provided
         elif company_name:
             target_company_name = company_name
             target_company_website = f"https://{company_name.lower().replace(' ', '')}.com"  # Placeholder
@@ -398,7 +254,7 @@ async def find_comparables_with_financials(
                 # Fallback to basic description
                 company_description = f"{company_name} is a company that we're analyzing for comparable companies."
         
-        # Case 4: Only company website provided
+        # Case 3: Only company website provided
         elif company_website:
             # Extract company name from website
             from urllib.parse import urlparse
@@ -418,7 +274,7 @@ async def find_comparables_with_financials(
                 company_description = f"{target_company_name} is a company with website {company_website} that we're analyzing for comparable companies."
         
         else:
-            raise HTTPException(status_code=400, detail="At least one of company_id, company_name, or company_website must be provided")
+            raise HTTPException(status_code=400, detail="At least one of company_name or company_website must be provided")
         
         # Find comparable companies
         comparable_companies = deepseek_client.find_comparable_companies(
@@ -459,7 +315,7 @@ async def find_comparables_with_financials(
         
         return {
             "target_company": {
-                "id": company_id,
+                "id": None,
                 "name": target_company_name,
                 "website": target_company_website,
                 "description": company_description
@@ -473,7 +329,6 @@ async def find_comparables_with_financials(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
 
-# NEW: Interactive Refinement (Extension 2)
 @app.post("/api/refine-comparables", tags=["analysis", "refinement"])
 async def refine_comparable_search(
     original_request: Dict[str, Any] = Body(..., description="Original search request"),
@@ -522,7 +377,6 @@ async def refine_comparable_search(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error refining search: {str(e)}")
 
-# NEW: Get refinement suggestions
 @app.get("/api/refinement-suggestions", tags=["analysis", "refinement"])
 async def get_refinement_suggestions():
     """
@@ -552,6 +406,137 @@ async def get_refinement_suggestions():
             }
         ]
     }
+
+# Root endpoint
+@app.get("/")
+async def read_root():
+    return {"message": "Welcome to the Company Comparison API"}
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+# Get all companies
+@app.get("/api/companies", response_model=List[Company], tags=["companies"])
+async def get_companies():
+    """Get all companies"""
+    return db.get_all_companies()
+
+# Get a specific company by ID
+@app.get("/api/companies/{company_id}", response_model=Company, tags=["companies"])
+async def get_company(company_id: str = Path(..., description="The ID of the company to retrieve")):
+    """Get a specific company by ID"""
+    company = db.get_company(company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
+    return company
+
+# Create a new company
+@app.post("/api/companies", response_model=Company, status_code=201, tags=["companies"])
+async def create_company(company: CompanyCreate):
+    """Create a new company"""
+    # Generate a simple ID based on the company name
+    company_id = company.name.lower().replace(" ", "_")[:10] + "_" + str(len(db.get_all_companies()) + 1)
+    
+    # Check if company with this ID already exists
+    if db.get_company(company_id):
+        raise HTTPException(status_code=400, detail=f"Company with ID {company_id} already exists")
+    
+    # Create new company object
+    new_company = Company(
+        id=company_id,
+        **company.dict()
+    )
+    
+    # Add to database
+    return db.create_company(company_id, new_company)
+
+# Update a company
+@app.put("/api/companies/{company_id}", response_model=Company, tags=["companies"])
+async def update_company(
+    company_data: Dict[str, Any],
+    company_id: str = Path(..., description="The ID of the company to update")
+):
+    """Update a company"""
+    updated_company = db.update_company(company_id, company_data)
+    if not updated_company:
+        raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
+    return updated_company
+
+# Delete a company
+@app.delete("/api/companies/{company_id}", tags=["companies"])
+async def delete_company(company_id: str = Path(..., description="The ID of the company to delete")):
+    """Delete a company"""
+    success = db.delete_company(company_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
+    return {"message": f"Company with ID {company_id} deleted successfully"}
+
+# Compare companies
+@app.get("/api/compare", response_model=ComparisonResult, tags=["comparison"])
+async def compare(
+    company_ids: List[str] = Query(..., description="List of company IDs to compare")
+):
+    """Compare multiple companies"""
+    # Check if we have at least 2 companies to compare
+    if len(company_ids) < 2:
+        raise HTTPException(status_code=400, detail="At least two companies are required for comparison")
+    
+    # Get companies from database
+    companies = []
+    for company_id in company_ids:
+        company = db.get_company(company_id)
+        if not company:
+            raise HTTPException(status_code=404, detail=f"Company with ID {company_id} not found")
+        companies.append(company)
+    
+    # Generate comparison
+    try:
+        comparison_result = compare_companies(companies)
+        return comparison_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error comparing companies: {str(e)}")
+
+
+# Realtime market data endpoints (FMP)
+@app.get("/api/market/quote/{ticker}", tags=["market"])
+async def get_realtime_quote(ticker: str = Path(..., description="Stock ticker symbol, e.g., AAPL")):
+    """Get real-time quote for a single ticker using FMP"""
+    data = fmp_client.get_company_quote(ticker)
+    # FMP returns a list for quote endpoints; normalize to single object when possible
+    if isinstance(data, list):
+        if not data:
+            raise HTTPException(status_code=404, detail=f"Quote not found for {ticker}")
+        data = data[0]
+    if isinstance(data, dict) and data.get("error"):
+        raise HTTPException(status_code=502, detail=data["error"]) 
+    return data
+
+@app.get("/api/market/price/{ticker}", tags=["market"])
+async def get_realtime_price(ticker: str = Path(..., description="Stock ticker symbol, e.g., AAPL")):
+    """Get lightweight real-time price for a single ticker using FMP"""
+    data = fmp_client.get_realtime_price(ticker)
+    if isinstance(data, list):
+        if not data:
+            raise HTTPException(status_code=404, detail=f"Price not found for {ticker}")
+        data = data[0]
+    if isinstance(data, dict) and data.get("error"):
+        raise HTTPException(status_code=502, detail=data["error"]) 
+    return data
+
+@app.get("/api/market/quotes", tags=["market"])
+async def get_realtime_quotes(tickers: List[str] = Query(..., description="Tickers as repeated params (?tickers=AAPL&tickers=MSFT) or a single comma-separated value")):
+    """Get real-time quotes for multiple tickers using FMP"""
+    # Support both repeated params and comma-separated inside a single item
+    if isinstance(tickers, list) and len(tickers) == 1 and "," in tickers[0]:
+        tickers = [t.strip() for t in tickers[0].split(",") if t.strip()]
+    data = fmp_client.get_realtime_prices(tickers)
+    if isinstance(data, dict) and data.get("error"):
+        raise HTTPException(status_code=502, detail=data["error"]) 
+    if isinstance(tickers, list) and not data:
+        raise HTTPException(status_code=404, detail="No quotes found for provided tickers")
+    return data
 
 # Run the application
 if __name__ == "__main__":

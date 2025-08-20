@@ -69,32 +69,43 @@ class DeepSeekAPI:
         except (KeyError, IndexError, json.JSONDecodeError) as e:
             raise ValueError(f"Failed to parse DeepSeek API response: {e}")
 
-        # Ensure required keys exist; provide safe defaults
+        # Ensure required keys exist; provide safe defaults and normalize list values to strings
+        def _to_string(value):
+            if value is None:
+                return None
+            if isinstance(value, list):
+                return ", ".join(str(item) for item in value)
+            if isinstance(value, (dict,)):
+                import json as _json
+                return _json.dumps(value, ensure_ascii=False)
+            return str(value)
+
         result = {
-            "description": data.get("description", ""),
-            "industry": data.get("industry"),
-            "business_model": data.get("business_model"),
-            "products_or_services": data.get("products_or_services"),
-            "target_market": data.get("target_market"),
-            "company_size": data.get("company_size"),
-            "geographic_presence": data.get("geographic_presence"),
-            "key_differentiators": data.get("key_differentiators")
+            "description": _to_string(data.get("description", "")),
+            "industry": _to_string(data.get("industry")),
+            "business_model": _to_string(data.get("business_model")),
+            "products_or_services": _to_string(data.get("products_or_services")),
+            "target_market": _to_string(data.get("target_market")),
+            "company_size": _to_string(data.get("company_size")),
+            "geographic_presence": _to_string(data.get("geographic_presence")),
+            "key_differentiators": _to_string(data.get("key_differentiators"))
         }
         return result
     
     def find_comparable_companies(self, company_description: str, count: int = 10) -> List[Dict[str, Any]]:
         """Find comparable public companies based on a company description"""
-        prompt = f"""Based on the following company description, identify {count} comparable public companies.
-        
+        prompt = f"""
+        Based on the following company description, identify exactly {count} comparable public companies.
+
         Company Description:
         {company_description}
-        
-        For each comparable company, provide:
-        1. Company Name
-        2. Stock Ticker
-        3. Match Rationale (why this company is comparable - industry, business model, size, market focus, etc.)
-        
-        Format the response as a JSON array with objects containing 'name', 'ticker', and 'rationale' fields."""
+
+        Return a JSON object with a single key "companies" whose value is an array of objects.
+        Each object must have these exact keys:
+        - name: string (company name)
+        - ticker: string (stock symbol, e.g., AAPL)
+        - rationale: string (why this is comparable: industry, business model, size, market focus, etc.)
+        """
         
         payload = {
             "model": "deepseek-chat",
@@ -111,9 +122,33 @@ class DeepSeekAPI:
         # Extract the generated comparable companies from the response
         try:
             content = response["choices"][0]["message"]["content"]
-            # The content should be a JSON string that we need to parse
             import json
-            comparable_companies = json.loads(content)
-            return comparable_companies.get("companies", [])
+            data = json.loads(content)
         except (KeyError, IndexError, json.JSONDecodeError) as e:
             raise ValueError(f"Failed to parse DeepSeek API response: {e}")
+
+        # Handle both object-with-companies and bare array formats
+        if isinstance(data, dict):
+            companies_raw = data.get("companies", [])
+        elif isinstance(data, list):
+            companies_raw = data
+        else:
+            companies_raw = []
+
+        # Normalize fields and filter invalid entries
+        normalized: List[Dict[str, Any]] = []
+        for item in companies_raw:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name") or item.get("company") or item.get("company_name")
+            ticker = item.get("ticker") or item.get("symbol")
+            rationale = item.get("rationale") or item.get("reason") or item.get("match_rationale")
+            if not name or not ticker:
+                continue
+            normalized.append({
+                "name": str(name),
+                "ticker": str(ticker),
+                "rationale": str(rationale) if rationale is not None else ""
+            })
+
+        return normalized
