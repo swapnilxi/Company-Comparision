@@ -25,17 +25,22 @@ interface CompanyComparisonTableProps {
   };
   selectedCompanies: Set<string>;
   onCompanySelectionChange: (selected: Set<string>) => void;
+  detailedData?: Record<string, any> | null;
+  onRefreshData?: () => void;
+  isLoadingDetailed?: boolean;
 }
 
 const EnhancedComparisonTable: React.FC<CompanyComparisonTableProps> = ({
   comparableCompanies,
   targetCompany,
   selectedCompanies,
-  onCompanySelectionChange
+  onCompanySelectionChange,
+  detailedData: propDetailedData,
+  onRefreshData,
+  isLoadingDetailed
 }) => {
   const [showTargetCompany, setShowTargetCompany] = useState(true);
   const [detailedData, setDetailedData] = useState<Record<string, any> | null>(null);
-  const [loadingDetailed, setLoadingDetailed] = useState(false);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
   const [filters, setFilters] = useState({
     company_size: [] as string[],
@@ -49,6 +54,13 @@ const EnhancedComparisonTable: React.FC<CompanyComparisonTableProps> = ({
   useEffect(() => {
     fetchFilterOptions();
   }, []);
+
+  // Use prop detailed data if available
+  useEffect(() => {
+    if (propDetailedData) {
+      setDetailedData(propDetailedData);
+    }
+  }, [propDetailedData]);
 
   const fetchFilterOptions = async () => {
     try {
@@ -79,37 +91,6 @@ const EnhancedComparisonTable: React.FC<CompanyComparisonTableProps> = ({
 
   const clearSelection = () => {
     onCompanySelectionChange(new Set());
-  };
-
-  const fetchDetailedData = async () => {
-    if (selectedCompanies.size === 0) return;
-    
-    setLoadingDetailed(true);
-    try {
-      const tickers = Array.from(selectedCompanies);
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-      const response = await fetch(`${API_BASE}/api/detailed-comparison`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tickers,
-          include_ratios: true,
-          include_statements: false,
-          filters
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch detailed data');
-      }
-      
-      const data = await response.json();
-      setDetailedData(data);
-    } catch (error) {
-      console.error('Error fetching detailed data:', error);
-    } finally {
-      setLoadingDetailed(false);
-    }
   };
 
   const formatValue = (value: any): string => {
@@ -316,13 +297,23 @@ const EnhancedComparisonTable: React.FC<CompanyComparisonTableProps> = ({
             >
               Clear
             </button>
-            {selectedCompanies.size > 0 && (
+            {onRefreshData && (
               <button
-                onClick={fetchDetailedData}
-                disabled={loadingDetailed}
-                className="px-3 py-1 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+                onClick={onRefreshData}
+                disabled={isLoadingDetailed}
+                className="p-2 text-gray-600 hover:text-blue-600 transition-colors disabled:opacity-50"
+                title="Refresh data"
               >
-                {loadingDetailed ? 'Loading...' : 'Get Detailed Data'}
+                {isLoadingDetailed ? (
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
               </button>
             )}
           </div>

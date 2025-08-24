@@ -59,6 +59,7 @@ export default function Home() {
     industry_sectors: [] as string[]
   });
   const [showFilters, setShowFilters] = React.useState(true);
+  const [detailedData, setDetailedData] = React.useState<Record<string, any> | null>(null);
 
   async function fetchProfileByTicker(symbol: string): Promise<void> {
     if (!symbol) return;
@@ -184,9 +185,48 @@ export default function Home() {
     setSelectedCompanies(newSelection);
   };
 
-  const handleCompareSelected = () => {
+  const handleCompareSelected = async () => {
     if (selectedCompanies.size > 0) {
       setActiveTab("comparison");
+      // Auto-fetch detailed data when switching to comparison tab
+      await fetchDetailedDataForSelected();
+    }
+  };
+
+  const fetchDetailedDataForSelected = async () => {
+    if (selectedCompanies.size === 0) return;
+    
+    setLoadingAction("compare");
+    try {
+      const tickers = Array.from(selectedCompanies);
+      console.log('Fetching detailed data for tickers:', tickers);
+      
+      const response = await fetch(`${API_BASE}/api/detailed-comparison`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tickers,
+          include_ratios: true,
+          include_statements: false,
+          filters
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', errorText);
+        throw new Error(`Failed to fetch detailed data: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Received detailed data:', data);
+      setDetailedData(data);
+      setError(null); // Clear any previous errors
+    } catch (error) {
+      console.error('Error fetching detailed data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch detailed comparison data');
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -271,6 +311,9 @@ export default function Home() {
       }
       const data = (await res.json()) as FindComparablesResponse;
       setComparables(data);
+      // Clear selections and detailed data when filters are applied
+      setSelectedCompanies(new Set());
+      setDetailedData(null);
     } catch (err: any) {
       setError(err?.message || "Unknown error");
     } finally {
@@ -442,26 +485,29 @@ export default function Home() {
             {/* Tab Navigation */}
             <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-2">
               <div className="flex space-x-1">
-                <button
-                  onClick={() => setActiveTab("results")}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === "results"
-                      ? "bg-blue-500 text-white shadow-lg"
-                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  Results View
-                </button>
-                <button
-                  onClick={() => setActiveTab("comparison")}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === "comparison"
-                      ? "bg-blue-500 text-white shadow-lg"
-                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  Comparison Table
-                </button>
+                              <button
+                onClick={() => {
+                  setActiveTab("results");
+                  setDetailedData(null);
+                }}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === "results"
+                    ? "bg-blue-500 text-white shadow-lg"
+                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}
+              >
+                Results View
+              </button>
+              <button
+                onClick={() => setActiveTab("comparison")}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === "comparison"
+                    ? "bg-blue-500 text-white shadow-lg"
+                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}
+              >
+                Comparison Table
+              </button>
               </div>
             </div>
 
@@ -592,9 +638,17 @@ export default function Home() {
                     {selectedCompanies.size > 0 && (
                       <button
                         onClick={handleCompareSelected}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        disabled={loadingAction === "compare"}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
                       >
-                        Compare Selected ({selectedCompanies.size})
+                        {loadingAction === "compare" ? (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Loading...
+                          </span>
+                        ) : (
+                          `Compare Selected (${selectedCompanies.size})`
+                        )}
                       </button>
                     )}
                   </div>
@@ -645,9 +699,16 @@ export default function Home() {
             {activeTab === "comparison" && (
               <EnhancedComparisonTable
                 comparableCompanies={comparables.comparable_companies || []}
-                targetCompany={comparables.target_company}
+                targetCompany={{
+                  name: comparables.target_company?.name || undefined,
+                  website: comparables.target_company?.website || undefined,
+                  description: comparables.target_company?.description || undefined
+                }}
                 selectedCompanies={selectedCompanies}
                 onCompanySelectionChange={setSelectedCompanies}
+                detailedData={detailedData}
+                onRefreshData={fetchDetailedDataForSelected}
+                isLoadingDetailed={loadingAction === "compare"}
               />
             )}
           </section>

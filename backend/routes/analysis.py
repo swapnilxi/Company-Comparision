@@ -28,11 +28,25 @@ def apply_filters_to_companies(companies: List[Dict[str, Any]], filters: Dict[st
         # Get company profile data to apply filters
         try:
             profile = fmp_client.get_company_profile(company.get("ticker", ""))
-            if isinstance(profile, list) and len(profile) > 0:
-                profile = profile[0]
             
-            if not isinstance(profile, dict) or profile.get("error"):
-                # If we can't get profile data, include the company anyway
+            # Handle different response formats from FMP API
+            if isinstance(profile, list):
+                if len(profile) > 0:
+                    profile = profile[0]
+                else:
+                    # Empty list - include company anyway
+                    filtered_companies.append(company)
+                    continue
+            
+            # Check if profile is valid
+            if not isinstance(profile, dict):
+                # Invalid profile - include company anyway
+                filtered_companies.append(company)
+                continue
+            
+            # Check for error in profile
+            if profile.get("error"):
+                # Error in profile - include company anyway
                 filtered_companies.append(company)
                 continue
             
@@ -539,7 +553,9 @@ async def get_detailed_comparison(
             profile = fmp_client.get_company_profile(ticker)
             if isinstance(profile, list) and len(profile) > 0:
                 profile = profile[0]
-            if not isinstance(profile, dict) or profile.get("error"):
+            if not isinstance(profile, dict):
+                ticker_data["error"] = "Failed to fetch profile - invalid response"
+            elif profile.get("error"):
                 ticker_data["error"] = profile.get("error", "Failed to fetch profile")
             else:
                 ticker_data["profile"] = profile
@@ -548,7 +564,9 @@ async def get_detailed_comparison(
             quote = fmp_client.get_company_quote(ticker)
             if isinstance(quote, list) and len(quote) > 0:
                 quote = quote[0]
-            if not isinstance(quote, dict) or quote.get("error"):
+            if not isinstance(quote, dict):
+                ticker_data["quote_error"] = "Failed to fetch quote - invalid response"
+            elif quote.get("error"):
                 ticker_data["quote_error"] = quote.get("error", "Failed to fetch quote")
             else:
                 ticker_data["quote"] = quote
@@ -558,7 +576,9 @@ async def get_detailed_comparison(
                 ratios = fmp_client.get_financial_ratios(ticker)
                 if isinstance(ratios, list) and len(ratios) > 0:
                     ratios = ratios[0]  # Get most recent
-                if not isinstance(ratios, dict) or ratios.get("error"):
+                if not isinstance(ratios, dict):
+                    ticker_data["ratios_error"] = "Failed to fetch ratios - invalid response"
+                elif ratios.get("error"):
                     ticker_data["ratios_error"] = ratios.get("error", "Failed to fetch ratios")
                 else:
                     ticker_data["ratios"] = ratios
@@ -608,7 +628,9 @@ async def get_company_details(
         profile = fmp_client.get_company_profile(ticker)
         if isinstance(profile, list) and len(profile) > 0:
             profile = profile[0]
-        if not isinstance(profile, dict) or profile.get("error"):
+        if not isinstance(profile, dict):
+            company_data["error"] = "Failed to fetch profile - invalid response"
+        elif profile.get("error"):
             company_data["error"] = profile.get("error", "Failed to fetch profile")
         else:
             company_data["profile"] = profile
@@ -617,7 +639,9 @@ async def get_company_details(
         quote = fmp_client.get_company_quote(ticker)
         if isinstance(quote, list) and len(quote) > 0:
             quote = quote[0]
-        if not isinstance(quote, dict) or quote.get("error"):
+        if not isinstance(quote, dict):
+            company_data["quote_error"] = "Failed to fetch quote - invalid response"
+        elif quote.get("error"):
             company_data["quote_error"] = quote.get("error", "Failed to fetch quote")
         else:
             company_data["quote"] = quote
@@ -627,7 +651,9 @@ async def get_company_details(
             ratios = fmp_client.get_financial_ratios(ticker)
             if isinstance(ratios, list) and len(ratios) > 0:
                 ratios = ratios[0]  # Get most recent
-            if not isinstance(ratios, dict) or ratios.get("error"):
+            if not isinstance(ratios, dict):
+                company_data["ratios_error"] = "Failed to fetch ratios - invalid response"
+            elif ratios.get("error"):
                 company_data["ratios_error"] = ratios.get("error", "Failed to fetch ratios")
             else:
                 company_data["ratios"] = ratios
@@ -638,7 +664,9 @@ async def get_company_details(
             income = fmp_client.get_income_statement(ticker)
             if isinstance(income, list) and len(income) > 0:
                 income = income[0]  # Get most recent
-            if not isinstance(income, dict) or income.get("error"):
+            if not isinstance(income, dict):
+                company_data["financials_error"] = "Failed to fetch financials - invalid response"
+            elif income.get("error"):
                 company_data["financials_error"] = income.get("error", "Failed to fetch financials")
             else:
                 company_data["financials"] = income
