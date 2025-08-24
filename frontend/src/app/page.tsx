@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import EnhancedComparisonTable from "../components/EnhancedComparisonTable";
 
 type ComparableCompany = {
   name: string;
@@ -48,6 +49,16 @@ export default function Home() {
   const [error, setError] = React.useState<string | null>(null);
   const [analysis, setAnalysis] = React.useState<CompanyAnalysisResponse | null>(null);
   const [comparables, setComparables] = React.useState<FindComparablesResponse | null>(null);
+  const [activeTab, setActiveTab] = React.useState<"results" | "comparison">("results");
+  const [selectedCompanies, setSelectedCompanies] = React.useState<Set<string>>(new Set());
+  const [filterOptions, setFilterOptions] = React.useState<any>(null);
+  const [filters, setFilters] = React.useState({
+    company_size: [] as string[],
+    geography: [] as string[],
+    business_characteristics: [] as string[],
+    industry_sectors: [] as string[]
+  });
+  const [showFilters, setShowFilters] = React.useState(true);
 
   async function fetchProfileByTicker(symbol: string): Promise<void> {
     if (!symbol) return;
@@ -162,6 +173,110 @@ export default function Home() {
       setLoadingAction(null);
     }
   }
+
+  const handleCompanySelection = (ticker: string) => {
+    const newSelection = new Set(selectedCompanies);
+    if (newSelection.has(ticker)) {
+      newSelection.delete(ticker);
+    } else {
+      newSelection.add(ticker);
+    }
+    setSelectedCompanies(newSelection);
+  };
+
+  const handleCompareSelected = () => {
+    if (selectedCompanies.size > 0) {
+      setActiveTab("comparison");
+    }
+  };
+
+  // Fetch filter options on component mount
+  React.useEffect(() => {
+    fetchFilterOptions();
+  }, []);
+
+  const fetchFilterOptions = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/filter-options`);
+      if (response.ok) {
+        const data = await response.json();
+        setFilterOptions(data);
+      }
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+    }
+  };
+
+  const handleFilterChange = (filterType: string, value: string) => {
+    setFilters(prev => {
+      const newFilters = { ...prev };
+      if (newFilters[filterType as keyof typeof filters].includes(value)) {
+        newFilters[filterType as keyof typeof filters] = newFilters[filterType as keyof typeof filters].filter(v => v !== value);
+      } else {
+        newFilters[filterType as keyof typeof filters] = [...newFilters[filterType as keyof typeof filters], value];
+      }
+      return newFilters;
+    });
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      company_size: [],
+      geography: [],
+      business_characteristics: [],
+      industry_sectors: []
+    });
+  };
+
+  const getFilteredCompanies = () => {
+    if (!comparables?.comparable_companies) return [];
+    
+    // Return all companies for now - filtering is done on the backend
+    return comparables.comparable_companies;
+  };
+
+  const applyFilters = async () => {
+    if (!comparables) return;
+    
+    setLoadingAction("compare");
+    try {
+      const headers = { "Content-Type": "application/json" };
+      const body: Record<string, any> = { 
+        count,
+        filters
+      };
+
+      // Priority: ticker > name+website > name > website > company_id
+      if (ticker) {
+        body.ticker = ticker.trim();
+      } else if (companyName && companyWebsite) {
+        body.company_name = companyName.trim();
+        body.company_website = companyWebsite.trim();
+      } else if (companyName) {
+        body.company_name = companyName.trim();
+      } else if (companyWebsite) {
+        body.company_website = companyWebsite.trim();
+      } else if (companyId) {
+        body.company_id = companyId.trim();
+      }
+
+      const res = await fetch(`${API_BASE}/api/find-comparables`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Request failed");
+      }
+      const data = (await res.json()) as FindComparablesResponse;
+      setComparables(data);
+    } catch (err: any) {
+      setError(err?.message || "Unknown error");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
 
   return (
     <div className="font-sans min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900">
@@ -324,45 +439,217 @@ export default function Home() {
 
         {comparables && (
           <section className="space-y-6">
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6">
-              <h2 className="text-xl font-semibold mb-4 bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Target Company</h2>
-              <div className="text-sm space-y-3">
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Name:</span> <span className="break-words text-gray-900 dark:text-gray-100">{comparables.target_company?.name || "-"}</span></div>
-                  <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Website:</span> <span className="break-all text-blue-600 dark:text-blue-400">{comparables.target_company?.website || "-"}</span></div>
-                </div>
-                <div className="whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">{comparables.target_company?.description || ""}</div>
+            {/* Tab Navigation */}
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-2">
+              <div className="flex space-x-1">
+                <button
+                  onClick={() => setActiveTab("results")}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    activeTab === "results"
+                      ? "bg-blue-500 text-white shadow-lg"
+                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  Results View
+                </button>
+                <button
+                  onClick={() => setActiveTab("comparison")}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    activeTab === "comparison"
+                      ? "bg-blue-500 text-white shadow-lg"
+                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  Comparison Table
+                </button>
               </div>
             </div>
 
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6">
-              <h2 className="text-xl font-semibold mb-4 bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">Comparable Companies</h2>
-              {comparables.comparable_companies?.length ? (
-                <ul className="space-y-4 max-w-full">
-                  {comparables.comparable_companies.map((c, idx) => (
-                    <li key={`${c.ticker}-${idx}`} className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-800/50 overflow-hidden hover:shadow-lg transition-all">
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <div className="font-medium break-words flex-1 min-w-0 text-gray-900 dark:text-gray-100">{c.name}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400 flex-shrink-0 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-full">{c.ticker}</div>
+            {activeTab === "results" && (
+              <>
+                {/* Filters Section */}
+                {filterOptions && (
+                  <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 p-4 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        Filter Comparable Companies
+                      </h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowFilters(!showFilters)}
+                          className="px-3 py-1 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                        >
+                          {showFilters ? 'Hide' : 'Show'} Filters
+                        </button>
+                        <button
+                          onClick={clearFilters}
+                          className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                        >
+                          Clear All
+                        </button>
+                        <button
+                          onClick={applyFilters}
+                          disabled={loadingAction === "compare"}
+                          className="px-3 py-1 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                        >
+                          {loadingAction === "compare" ? "Applying..." : "Apply Filters"}
+                        </button>
                       </div>
-                      <div className="text-sm whitespace-pre-wrap break-words text-gray-700 dark:text-gray-300">{c.rationale}</div>
-                      {c.financial_metrics && (
-                        <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                          {Object.entries(c.financial_metrics).map(([k, v]) => (
-                            <div key={k} className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 flex-shrink-0 bg-white/50 dark:bg-gray-700/50">
-                              <span className="font-medium mr-1 break-words text-gray-700 dark:text-gray-300">{k}:</span>
-                              <span className="break-words text-gray-900 dark:text-gray-100">{String(v)}</span>
-                            </div>
-                          ))}
+                    </div>
+
+                    {showFilters && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Company Size Filter */}
+                        <div>
+                          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Company Size</h4>
+                          <div className="space-y-1">
+                            {filterOptions.company_size.map((option: any) => (
+                              <label key={option.value} className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={filters.company_size.includes(option.value)}
+                                  onChange={() => handleFilterChange('company_size', option.value)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-gray-600 dark:text-gray-400">{option.label}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-sm text-gray-600 dark:text-gray-400">No comparable companies found.</div>
-              )}
-            </div>
+
+                        {/* Geography Filter */}
+                        <div>
+                          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Geography</h4>
+                          <div className="space-y-1">
+                            {filterOptions.geography.map((option: any) => (
+                              <label key={option.value} className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={filters.geography.includes(option.value)}
+                                  onChange={() => handleFilterChange('geography', option.value)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-gray-600 dark:text-gray-400">{option.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Business Characteristics Filter */}
+                        <div>
+                          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Business Model</h4>
+                          <div className="space-y-1">
+                            {filterOptions.business_characteristics.map((option: any) => (
+                              <label key={option.value} className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={filters.business_characteristics.includes(option.value)}
+                                  onChange={() => handleFilterChange('business_characteristics', option.value)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-gray-600 dark:text-gray-400">{option.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Industry Sectors Filter */}
+                        <div>
+                          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Industry</h4>
+                          <div className="space-y-1">
+                            {filterOptions.industry_sectors.map((option: any) => (
+                              <label key={option.value} className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={filters.industry_sectors.includes(option.value)}
+                                  onChange={() => handleFilterChange('industry_sectors', option.value)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-gray-600 dark:text-gray-400">{option.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6">
+                  <h2 className="text-xl font-semibold mb-4 bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Target Company</h2>
+                  <div className="text-sm space-y-3">
+                    <div className="flex flex-wrap gap-4">
+                      <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Name:</span> <span className="break-words text-gray-900 dark:text-gray-100">{comparables.target_company?.name || "-"}</span></div>
+                      <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Website:</span> <span className="break-all text-blue-600 dark:text-blue-400">{comparables.target_company?.website || "-"}</span></div>
+                    </div>
+                    <div className="whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">{comparables.target_company?.description || ""}</div>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">Comparable Companies</h2>
+                    {selectedCompanies.size > 0 && (
+                      <button
+                        onClick={handleCompareSelected}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                      >
+                        Compare Selected ({selectedCompanies.size})
+                      </button>
+                    )}
+                  </div>
+                  {getFilteredCompanies().length ? (
+                    <ul className="space-y-4 max-w-full">
+                      {getFilteredCompanies().map((c, idx) => (
+                        <li key={`${c.ticker}-${idx}`} className="p-4 border border-gray-200 dark:border-gray-600 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700/50 dark:to-gray-800/50 overflow-hidden hover:shadow-lg transition-all">
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedCompanies.has(c.ticker)}
+                              onChange={() => handleCompanySelection(c.ticker)}
+                              className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <div className="flex-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <div className="font-medium break-words flex-1 min-w-0 text-gray-900 dark:text-gray-100">{c.name}</div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400 flex-shrink-0 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-full">{c.ticker}</div>
+                              </div>
+                              <div className="text-sm whitespace-pre-wrap break-words text-gray-700 dark:text-gray-300">{c.rationale}</div>
+                              {c.financial_metrics && (
+                                <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                                  {Object.entries(c.financial_metrics).map(([k, v]) => (
+                                    <div key={k} className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 flex-shrink-0 bg-white/50 dark:bg-gray-700/50">
+                                      <span className="font-medium mr-1 break-words text-gray-700 dark:text-gray-300">{k}:</span>
+                                      <span className="break-words text-gray-900 dark:text-gray-100">{String(v)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      {comparables.comparable_companies?.length ? 
+                        "No companies match the selected filters." : 
+                        "No comparable companies found."
+                      }
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {activeTab === "comparison" && (
+              <EnhancedComparisonTable
+                comparableCompanies={comparables.comparable_companies || []}
+                targetCompany={comparables.target_company}
+                selectedCompanies={selectedCompanies}
+                onCompanySelectionChange={setSelectedCompanies}
+              />
+            )}
           </section>
         )}
       </main>

@@ -14,13 +14,83 @@ router = APIRouter(prefix="/api", tags=["analysis"])
 deepseek_client = DeepSeekAPI()
 fmp_client = FMPAPI()
 
+def apply_filters_to_companies(companies: List[Dict[str, Any]], filters: Dict[str, List[str]]) -> List[Dict[str, Any]]:
+    """
+    Apply filters to comparable companies based on their characteristics.
+    This is a simplified implementation - in a real app, you would have more detailed company data.
+    """
+    if not filters or not any(filters.values()):
+        return companies
+    
+    filtered_companies = []
+    
+    for company in companies:
+        # Get company profile data to apply filters
+        try:
+            profile = fmp_client.get_company_profile(company.get("ticker", ""))
+            if isinstance(profile, list) and len(profile) > 0:
+                profile = profile[0]
+            
+            if not isinstance(profile, dict) or profile.get("error"):
+                # If we can't get profile data, include the company anyway
+                filtered_companies.append(company)
+                continue
+            
+            # Apply company size filter
+            if filters.get("company_size"):
+                market_cap = profile.get("mktCap", 0)
+                size_matches = False
+                
+                for size_filter in filters["company_size"]:
+                    if size_filter == "small" and market_cap < 2000000000:  # < $2B
+                        size_matches = True
+                    elif size_filter == "mid" and 2000000000 <= market_cap < 10000000000:  # $2B - $10B
+                        size_matches = True
+                    elif size_filter == "large" and 10000000000 <= market_cap < 100000000000:  # $10B - $100B
+                        size_matches = True
+                    elif size_filter == "mega" and market_cap >= 100000000000:  # >= $100B
+                        size_matches = True
+                
+                if not size_matches:
+                    continue
+            
+            # Apply geography filter (simplified - would need more data in real app)
+            if filters.get("geography"):
+                # For now, assume US companies if we have a ticker
+                # In a real app, you'd have geographic data
+                if "us" in filters["geography"] and company.get("ticker"):
+                    pass  # Include US companies
+                elif "us" not in filters["geography"]:
+                    continue  # Skip if not US and US not in filters
+            
+            # Apply business characteristics filter (simplified)
+            if filters.get("business_characteristics"):
+                # This would require more detailed company analysis
+                # For now, include all companies
+                pass
+            
+            # Apply industry sectors filter (simplified)
+            if filters.get("industry_sectors"):
+                # This would require more detailed company analysis
+                # For now, include all companies
+                pass
+            
+            filtered_companies.append(company)
+            
+        except Exception:
+            # If there's an error getting profile data, include the company anyway
+            filtered_companies.append(company)
+    
+    return filtered_companies
+
 @router.post("/find-comparables")
 async def find_comparables_from_input(
     company_id: Optional[str] = Body(None, embed=True, description="Company ID from database"),
     company_name: Optional[str] = Body(None, embed=True, description="Company name"),
     company_website: Optional[str] = Body(None, embed=True, description="Company website URL"),
     ticker: Optional[str] = Body(None, embed=True, description="Public market ticker symbol"),
-    count: int = Body(10, embed=True, description="Number of comparable companies to find", ge=1, le=20)
+    count: int = Body(10, embed=True, description="Number of comparable companies to find", ge=1, le=20),
+    filters: Dict[str, List[str]] = Body({}, embed=True, description="Filters for company characteristics")
 ):
     """
     Main endpoint that takes company information and finds comparable public companies.
@@ -126,6 +196,10 @@ async def find_comparables_from_input(
             count=count
         )
         
+        # Apply filters if provided
+        if filters and any(filters.values()):
+            comparable_companies = apply_filters_to_companies(comparable_companies, filters)
+        
         # Return combined result
         return {
             "target_company": {
@@ -135,6 +209,7 @@ async def find_comparables_from_input(
                 "description": company_description
             },
             "comparable_companies": comparable_companies,
+            "filters_applied": filters,
             "analysis_timestamp": "2024-01-01T00:00:00Z",  # In real app, use actual timestamp
             "input_type": "company_id" if company_id else (
                 "ticker" if ticker else (
@@ -423,6 +498,195 @@ async def get_refinement_suggestions():
                 "description": "Filter by business model",
                 "examples": ["SaaS", "e-commerce", "marketplace", "subscription"]
             }
+        ]
+    }
+
+@router.post("/detailed-comparison")
+async def get_detailed_comparison(
+    tickers: List[str] = Body(..., description="List of ticker symbols to compare"),
+    include_ratios: bool = Body(True, description="Include financial ratios"),
+    include_statements: bool = Body(False, description="Include financial statements"),
+    filters: Dict[str, Any] = Body({}, description="Filters for company characteristics")
+):
+    """
+    Get detailed financial comparison data for multiple companies.
+    
+    This endpoint provides comprehensive financial data for comparison including:
+    - Company profiles and basic metrics
+    - Financial ratios (P/E, P/B, ROE, etc.)
+    - Financial statements (if requested)
+    - Market data and valuation metrics
+    """
+    try:
+        if not tickers:
+            raise HTTPException(status_code=400, detail="At least one ticker must be provided")
+        
+        if len(tickers) > 10:
+            raise HTTPException(status_code=400, detail="Maximum 10 tickers allowed for comparison")
+        
+        comparison_data = []
+        
+        for ticker in tickers:
+            ticker_data = {
+                "ticker": ticker,
+                "profile": None,
+                "quote": None,
+                "ratios": None,
+                "statements": None
+            }
+            
+            # Get company profile
+            profile = fmp_client.get_company_profile(ticker)
+            if isinstance(profile, list) and len(profile) > 0:
+                profile = profile[0]
+            if not isinstance(profile, dict) or profile.get("error"):
+                ticker_data["error"] = profile.get("error", "Failed to fetch profile")
+            else:
+                ticker_data["profile"] = profile
+            
+            # Get quote data
+            quote = fmp_client.get_company_quote(ticker)
+            if isinstance(quote, list) and len(quote) > 0:
+                quote = quote[0]
+            if not isinstance(quote, dict) or quote.get("error"):
+                ticker_data["quote_error"] = quote.get("error", "Failed to fetch quote")
+            else:
+                ticker_data["quote"] = quote
+            
+            # Get financial ratios if requested
+            if include_ratios:
+                ratios = fmp_client.get_financial_ratios(ticker)
+                if isinstance(ratios, list) and len(ratios) > 0:
+                    ratios = ratios[0]  # Get most recent
+                if not isinstance(ratios, dict) or ratios.get("error"):
+                    ticker_data["ratios_error"] = ratios.get("error", "Failed to fetch ratios")
+                else:
+                    ticker_data["ratios"] = ratios
+            
+            # Get financial statements if requested
+            if include_statements:
+                statements = {
+                    "income": fmp_client.get_income_statement(ticker),
+                    "balance": fmp_client.get_balance_sheet(ticker),
+                    "cash_flow": fmp_client.get_cash_flow(ticker)
+                }
+                ticker_data["statements"] = statements
+            
+            comparison_data.append(ticker_data)
+        
+        return {
+            "tickers": tickers,
+            "comparison_data": comparison_data,
+            "include_ratios": include_ratios,
+            "include_statements": include_statements,
+            "filters_applied": filters,
+            "timestamp": "2024-01-01T00:00:00Z"  # In real app, use actual timestamp
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting detailed comparison: {str(e)}")
+
+@router.post("/company-details")
+async def get_company_details(
+    ticker: str = Body(..., description="Ticker symbol of the company"),
+    include_financials: bool = Body(True, description="Include financial metrics"),
+    include_ratios: bool = Body(True, description="Include financial ratios")
+):
+    """
+    Get detailed information for a single company including financial metrics and ratios.
+    """
+    try:
+        company_data = {
+            "ticker": ticker,
+            "profile": None,
+            "quote": None,
+            "ratios": None,
+            "financials": None
+        }
+        
+        # Get company profile
+        profile = fmp_client.get_company_profile(ticker)
+        if isinstance(profile, list) and len(profile) > 0:
+            profile = profile[0]
+        if not isinstance(profile, dict) or profile.get("error"):
+            company_data["error"] = profile.get("error", "Failed to fetch profile")
+        else:
+            company_data["profile"] = profile
+        
+        # Get quote data
+        quote = fmp_client.get_company_quote(ticker)
+        if isinstance(quote, list) and len(quote) > 0:
+            quote = quote[0]
+        if not isinstance(quote, dict) or quote.get("error"):
+            company_data["quote_error"] = quote.get("error", "Failed to fetch quote")
+        else:
+            company_data["quote"] = quote
+        
+        # Get financial ratios if requested
+        if include_ratios:
+            ratios = fmp_client.get_financial_ratios(ticker)
+            if isinstance(ratios, list) and len(ratios) > 0:
+                ratios = ratios[0]  # Get most recent
+            if not isinstance(ratios, dict) or ratios.get("error"):
+                company_data["ratios_error"] = ratios.get("error", "Failed to fetch ratios")
+            else:
+                company_data["ratios"] = ratios
+        
+        # Get additional financial data if requested
+        if include_financials:
+            # Get income statement for additional metrics
+            income = fmp_client.get_income_statement(ticker)
+            if isinstance(income, list) and len(income) > 0:
+                income = income[0]  # Get most recent
+            if not isinstance(income, dict) or income.get("error"):
+                company_data["financials_error"] = income.get("error", "Failed to fetch financials")
+            else:
+                company_data["financials"] = income
+        
+        return company_data
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting company details: {str(e)}")
+
+@router.get("/filter-options")
+async def get_filter_options():
+    """
+    Get available filter options for company characteristics
+    """
+    return {
+        "company_size": [
+            {"value": "small", "label": "Small Cap (< $2B)"},
+            {"value": "mid", "label": "Mid Cap ($2B - $10B)"},
+            {"value": "large", "label": "Large Cap (> $10B)"},
+            {"value": "mega", "label": "Mega Cap (> $100B)"}
+        ],
+        "geography": [
+            {"value": "us", "label": "United States"},
+            {"value": "europe", "label": "Europe"},
+            {"value": "asia", "label": "Asia"},
+            {"value": "global", "label": "Global"}
+        ],
+        "business_characteristics": [
+            {"value": "saas", "label": "SaaS/Software"},
+            {"value": "ecommerce", "label": "E-commerce"},
+            {"value": "marketplace", "label": "Marketplace"},
+            {"value": "subscription", "label": "Subscription Model"},
+            {"value": "b2b", "label": "B2B"},
+            {"value": "b2c", "label": "B2C"},
+            {"value": "fintech", "label": "Fintech"},
+            {"value": "healthtech", "label": "Health Tech"},
+            {"value": "ai_ml", "label": "AI/ML"},
+            {"value": "enterprise", "label": "Enterprise Software"}
+        ],
+        "industry_sectors": [
+            {"value": "technology", "label": "Technology"},
+            {"value": "healthcare", "label": "Healthcare"},
+            {"value": "finance", "label": "Financial Services"},
+            {"value": "retail", "label": "Retail"},
+            {"value": "manufacturing", "label": "Manufacturing"},
+            {"value": "energy", "label": "Energy"},
+            {"value": "telecommunications", "label": "Telecommunications"},
+            {"value": "consumer_goods", "label": "Consumer Goods"}
         ]
     }
 

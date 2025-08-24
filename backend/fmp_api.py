@@ -85,6 +85,11 @@ class FMPAPI:
             if isinstance(quote, list) and len(quote) > 0:
                 quote = quote[0]
             
+            # Get financial ratios
+            ratios = self.get_financial_ratios(ticker)
+            if isinstance(ratios, list) and len(ratios) > 0:
+                ratios = ratios[0]
+            
             # Extract key metrics
             metrics = {
                 "ticker": ticker,
@@ -95,6 +100,24 @@ class FMPAPI:
                 "ebitda": profile.get("ebitda", "N/A"),
                 "net_income": profile.get("netIncome", "N/A"),
                 "current_price": quote.get("price", "N/A"),
+                "price_change": quote.get("change", "N/A"),
+                "price_change_percent": quote.get("changesPercentage", "N/A"),
+                "volume": quote.get("volume", "N/A"),
+                "avg_volume": quote.get("avgVolume", "N/A"),
+                "day_low": quote.get("dayLow", "N/A"),
+                "day_high": quote.get("dayHigh", "N/A"),
+                "year_low": quote.get("yearLow", "N/A"),
+                "year_high": quote.get("yearHigh", "N/A"),
+                "pe_ratio": ratios.get("priceEarningsRatio", "N/A") if ratios else "N/A",
+                "pb_ratio": ratios.get("priceToBookRatio", "N/A") if ratios else "N/A",
+                "roe": ratios.get("returnOnEquity", "N/A") if ratios else "N/A",
+                "roa": ratios.get("returnOnAssets", "N/A") if ratios else "N/A",
+                "debt_to_equity": ratios.get("debtEquityRatio", "N/A") if ratios else "N/A",
+                "current_ratio": ratios.get("currentRatio", "N/A") if ratios else "N/A",
+                "quick_ratio": ratios.get("quickRatio", "N/A") if ratios else "N/A",
+                "gross_margin": ratios.get("grossProfitMargin", "N/A") if ratios else "N/A",
+                "operating_margin": ratios.get("operatingProfitMargin", "N/A") if ratios else "N/A",
+                "net_margin": ratios.get("netProfitMargin", "N/A") if ratios else "N/A",
                 "currency": "USD"
             }
             
