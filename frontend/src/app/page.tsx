@@ -275,6 +275,24 @@ export default function Home() {
     return comparables.comparable_companies;
   };
 
+  const hasValidValue = (value: any): boolean => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string' && (value.toLowerCase() === 'n/a' || value.toLowerCase() === 'null' || value.trim() === '')) return false;
+    if (typeof value === 'number' && (isNaN(value) || !isFinite(value))) return false;
+    return true;
+  };
+
+  const getValidFinancialMetrics = (metrics: Record<string, any> | undefined): Record<string, any> => {
+    if (!metrics) return {};
+    const validMetrics: Record<string, any> = {};
+    Object.entries(metrics).forEach(([key, value]) => {
+      if (hasValidValue(value)) {
+        validMetrics[key] = value;
+      }
+    });
+    return validMetrics;
+  };
+
   const applyFilters = async () => {
     if (!comparables) return;
     
@@ -669,16 +687,19 @@ export default function Home() {
                                 <div className="text-sm text-gray-600 dark:text-gray-400 flex-shrink-0 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-full">{c.ticker}</div>
                               </div>
                               <div className="text-sm whitespace-pre-wrap break-words text-gray-700 dark:text-gray-300">{c.rationale}</div>
-                              {c.financial_metrics && (
-                                <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                                  {Object.entries(c.financial_metrics).map(([k, v]) => (
-                                    <div key={k} className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 flex-shrink-0 bg-white/50 dark:bg-gray-700/50">
-                                      <span className="font-medium mr-1 break-words text-gray-700 dark:text-gray-300">{k}:</span>
-                                      <span className="break-words text-gray-900 dark:text-gray-100">{String(v)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              {(() => {
+                                const validMetrics = getValidFinancialMetrics(c.financial_metrics);
+                                return Object.keys(validMetrics).length > 0 && (
+                                  <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                                    {Object.entries(validMetrics).map(([k, v]) => (
+                                      <div key={k} className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 flex-shrink-0 bg-white/50 dark:bg-gray-700/50">
+                                        <span className="font-medium mr-1 break-words text-gray-700 dark:text-gray-300">{k}:</span>
+                                        <span className="break-words text-gray-900 dark:text-gray-100">{String(v)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         </li>
