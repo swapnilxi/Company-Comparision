@@ -97,6 +97,36 @@ def apply_filters_to_companies(companies: List[Dict[str, Any]], filters: Dict[st
     
     return filtered_companies
 
+@router.post("/refine-analysis")
+async def refine_analysis(
+    name: Optional[str] = Body(None, embed=True, description="Company name"),
+    website: Optional[str] = Body(None, embed=True, description="Company website URL"),
+    feedback: str = Body(..., embed=True, description="User feedback/instructions to refine the analysis")
+):
+    """
+    Refine/update company analysis using user feedback.
+
+    Accepts name and/or website (if missing, will try to infer minimal placeholders),
+    and a free-text feedback string to steer DeepSeek's updated analysis output.
+    """
+    try:
+        target_name = name or "Target Company"
+        target_website = website or (f"https://{(name or 'company').lower().replace(' ', '')}.com")
+
+        refined = deepseek_client.analyze_company_with_feedback(
+            company_name=target_name,
+            company_website=target_website,
+            feedback=feedback
+        )
+
+        return {
+            "name": target_name,
+            "website": target_website,
+            **refined
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error refining analysis: {str(e)}")
+
 @router.post("/find-comparables")
 async def find_comparables_from_input(
     company_id: Optional[str] = Body(None, embed=True, description="Company ID from database"),

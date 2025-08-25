@@ -61,6 +61,8 @@ export default function Home() {
   const [showFilters, setShowFilters] = React.useState(true);
   const [detailedData, setDetailedData] = React.useState<Record<string, any> | null>(null);
   const [hasFinancialData, setHasFinancialData] = React.useState<boolean>(false);
+  const [refineText, setRefineText] = React.useState<string>("");
+  const [refining, setRefining] = React.useState<boolean>(false);
 
   async function fetchProfileByTicker(symbol: string): Promise<void> {
     if (!symbol) return;
@@ -340,6 +342,49 @@ export default function Home() {
     }
   };
 
+  const refineAnalysis = async () => {
+    if (!analysis && !companyName && !companyWebsite && !ticker) return;
+    if (!refineText.trim()) return;
+    setRefining(true);
+    setError(null);
+    try {
+      // Prefer existing analysis.name/website; fallback to current inputs
+      const name = (analysis?.name || companyName || "").trim();
+      let website = (analysis?.website || companyWebsite || "").trim();
+      if (website && !website.startsWith("http")) website = `https://${website}`;
+
+      const res = await fetch(`${API_BASE}/api/refine-analysis`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, website, feedback: refineText.trim() }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      // Update analysis in place (append refined description for better UX)
+      const appendedDescription = [
+        analysis?.description || "",
+        (data?.description || "").trim()
+      ].filter(Boolean).join("\n\n");
+      setAnalysis({
+        name: data?.name || name,
+        website: data?.website || website,
+        description: appendedDescription,
+        industry: data?.industry ?? analysis?.industry,
+        business_model: data?.business_model ?? analysis?.business_model,
+        products_or_services: data?.products_or_services ?? analysis?.products_or_services,
+        target_market: data?.target_market ?? analysis?.target_market,
+        company_size: data?.company_size ?? analysis?.company_size,
+        geographic_presence: data?.geographic_presence ?? analysis?.geographic_presence,
+        key_differentiators: data?.key_differentiators ?? analysis?.key_differentiators,
+      });
+      setRefineText("");
+    } catch (err: any) {
+      setError(err?.message || 'Failed to refine analysis');
+    } finally {
+      setRefining(false);
+    }
+  };
+
   return (
     <div className="font-sans min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900">
       <main className="max-w-6xl mx-auto p-8 pb-20 sm:p-20">
@@ -612,6 +657,30 @@ export default function Home() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            {/* Bottom refine input */}
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Refine Analysis</h3>
+                <span className="text-xs text-gray-500">Give feedback to update the analysis</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white/50 dark:bg-gray-700/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="e.g., Emphasize enterprise SaaS focus and North America market"
+                  value={refineText}
+                  onChange={(e) => setRefineText(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={refineAnalysis}
+                  disabled={refining || !refineText.trim()}
+                  className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50"
+                >
+                  {refining ? 'Updating...' : 'Update'}
+                </button>
               </div>
             </div>
           </section>
