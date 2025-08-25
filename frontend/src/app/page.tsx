@@ -60,6 +60,7 @@ export default function Home() {
   });
   const [showFilters, setShowFilters] = React.useState(true);
   const [detailedData, setDetailedData] = React.useState<Record<string, any> | null>(null);
+  const [hasFinancialData, setHasFinancialData] = React.useState<boolean>(false);
 
   async function fetchProfileByTicker(symbol: string): Promise<void> {
     if (!symbol) return;
@@ -474,25 +475,143 @@ export default function Home() {
 
         {analysis && (
           <section className="space-y-4 mb-8">
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6">
-              <h2 className="text-xl font-semibold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Analysis</h2>
-              <div className="text-sm space-y-3">
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Name:</span> <span className="break-words text-gray-900 dark:text-gray-100">{analysis.name}</span></div>
-                  <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Website:</span> <span className="break-all text-blue-600 dark:text-blue-400">{analysis.website}</span></div>
+            {/* Header card: title + website */}
+            <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xl">
+              <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_20%_20%,white,transparent_40%),radial-gradient(circle_at_80%_0%,white,transparent_35%)]" />
+              <div className="relative p-6 sm:p-8">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs uppercase tracking-wider opacity-90">Analysis Target</div>
+                    <h2 className="mt-1 text-2xl sm:text-3xl font-semibold truncate">
+                      {analysis.name || 'Target Company'}
+                    </h2>
+                  </div>
+                  {analysis.website && (
+                    <a
+                      href={analysis.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/90 text-gray-900 hover:bg-white transition-colors shadow"
+                      title="Open website"
+                   >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-blue-600">
+                        <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 5a1 1 0 112 0v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H10a1 1 0 110-2h3V7z" />
+                      </svg>
+                      <span className="truncate max-w-[50vw] sm:max-w-[24rem] text-blue-700">{analysis.website}</span>
+                    </a>
+                  )}
                 </div>
+              </div>
+            </div>
+
+            {/* Description card (concise) */}
+            {analysis.description && (
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6">
+                <h2 className="text-xl font-semibold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Analysis</h2>
                 <div className="whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg">{analysis.description}</div>
-                <div className="flex flex-wrap gap-4">
-                  {analysis.industry && <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Industry:</span> <span className="break-words text-gray-900 dark:text-gray-100">{analysis.industry}</span></div>}
-                  {analysis.business_model && <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Business Model:</span> <span className="break-words text-gray-900 dark:text-gray-100">{analysis.business_model}</span></div>}
+              </div>
+            )}
+
+            {/* Formatted Summary: stat boxes */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {analysis.industry && (
+                <div className="p-4 rounded-xl border border-white/20 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 shadow">
+                  <div className="text-xs uppercase tracking-wide text-blue-700 dark:text-blue-300">Industry</div>
+                  <div className="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100 break-words">{analysis.industry}</div>
                 </div>
-                {analysis.products_or_services && <div className="break-words"><span className="font-medium text-gray-700 dark:text-gray-300">Products/Services:</span> <span className="text-gray-900 dark:text-gray-100">{analysis.products_or_services}</span></div>}
-                {analysis.target_market && <div className="break-words"><span className="font-medium text-gray-700 dark:text-gray-300">Target Market:</span> <span className="text-gray-900 dark:text-gray-100">{analysis.target_market}</span></div>}
-                <div className="flex flex-wrap gap-4">
-                  {analysis.company_size && <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Company Size:</span> <span className="break-words text-gray-900 dark:text-gray-100">{analysis.company_size}</span></div>}
-                  {analysis.geographic_presence && <div className="flex-1 min-w-0"><span className="font-medium text-gray-700 dark:text-gray-300">Geographic Presence:</span> <span className="break-words text-gray-900 dark:text-gray-100">{analysis.geographic_presence}</span></div>}
+              )}
+              {analysis.business_model && (
+                <div className="p-4 rounded-xl border border-white/20 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 shadow">
+                  <div className="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Business Model</div>
+                  <div className="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100 break-words">{analysis.business_model}</div>
                 </div>
-                {analysis.key_differentiators && <div className="break-words"><span className="font-medium text-gray-700 dark:text-gray-300">Key Differentiators:</span> <span className="text-gray-900 dark:text-gray-100">{analysis.key_differentiators}</span></div>}
+              )}
+              {analysis.company_size && (
+                <div className="p-4 rounded-xl border border-white/20 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 shadow">
+                  <div className="text-xs uppercase tracking-wide text-orange-700 dark:text-orange-300">Company Size</div>
+                  <div className="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100 break-words">{analysis.company_size}</div>
+                </div>
+              )}
+              {analysis.geographic_presence && (
+                <div className="p-4 rounded-xl border border-white/20 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 shadow">
+                  <div className="text-xs uppercase tracking-wide text-purple-700 dark:text-purple-300">Geographic Presence</div>
+                  <div className="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100 break-words">{analysis.geographic_presence}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Formatted Summary: compact table */}
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+              <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Formatted Analysis Summary</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Field</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tr>
+                      <td className="px-4 py-2 text-gray-600 dark:text-gray-300">Name</td>
+                      <td className="px-4 py-2 text-gray-900 dark:text-gray-100 break-words">{analysis.name || '-'}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-2 text-gray-600 dark:text-gray-300">Website</td>
+                      <td className="px-4 py-2 break-all">
+                        {analysis.website ? (
+                          <a href={analysis.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">{analysis.website}</a>
+                        ) : (
+                          <span className="text-gray-900 dark:text-gray-100">-</span>
+                        )}
+                      </td>
+                    </tr>
+                    {analysis.industry && (
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">Industry</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-gray-100 break-words">{analysis.industry}</td>
+                      </tr>
+                    )}
+                    {analysis.business_model && (
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">Business Model</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-gray-100 break-words">{analysis.business_model}</td>
+                      </tr>
+                    )}
+                    {analysis.products_or_services && (
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">Products/Services</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-gray-100 break-words">{analysis.products_or_services}</td>
+                      </tr>
+                    )}
+                    {analysis.target_market && (
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">Target Market</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-gray-100 break-words">{analysis.target_market}</td>
+                      </tr>
+                    )}
+                    {analysis.company_size && (
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">Company Size</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-gray-100 break-words">{analysis.company_size}</td>
+                      </tr>
+                    )}
+                    {analysis.geographic_presence && (
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">Geographic Presence</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-gray-100 break-words">{analysis.geographic_presence}</td>
+                      </tr>
+                    )}
+                    {analysis.key_differentiators && (
+                      <tr>
+                        <td className="px-4 py-2 text-gray-600 dark:text-gray-300">Key Differentiators</td>
+                        <td className="px-4 py-2 text-gray-900 dark:text-gray-100 break-words">{analysis.key_differentiators}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </section>
