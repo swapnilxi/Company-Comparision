@@ -2,6 +2,7 @@
 
 import React from "react";
 import EnhancedComparisonTable from "../components/EnhancedComparisonTable";
+import RAGChatbot from "../components/RAGChatbot";
 
 type ComparableCompany = {
   name: string;
@@ -63,6 +64,7 @@ export default function Home() {
   const [hasFinancialData, setHasFinancialData] = React.useState<boolean>(false);
   const [refineText, setRefineText] = React.useState<string>("");
   const [refining, setRefining] = React.useState<boolean>(false);
+  const [chatbotVisible, setChatbotVisible] = React.useState<boolean>(false);
 
   async function fetchProfileByTicker(symbol: string): Promise<void> {
     if (!symbol) return;
@@ -202,6 +204,11 @@ export default function Home() {
     setLoadingAction("compare");
     try {
       const tickers = Array.from(selectedCompanies);
+      // Include target ticker if present in comparables target_company
+      const targetTicker = comparables?.target_company && (comparables as any).target_company?.ticker;
+      if (targetTicker && !tickers.includes(targetTicker)) {
+        tickers.unshift(targetTicker);
+      }
       console.log('Fetching detailed data for tickers:', tickers);
       
       const response = await fetch(`${API_BASE}/api/detailed-comparison`, {
@@ -390,7 +397,7 @@ export default function Home() {
       <main className="max-w-6xl mx-auto p-8 pb-20 sm:p-20">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-            Company Comparables Finder
+            AI Startup and Company Comparables Finder
           </h1>
           <p className="text-gray-600 dark:text-gray-300">Discover comparable companies with AI-powered analysis</p>
         </div>
@@ -913,6 +920,7 @@ export default function Home() {
                   website: comparables.target_company?.website || undefined,
                   description: comparables.target_company?.description || undefined
                 }}
+                targetTicker={(comparables as any)?.target_company?.ticker}
                 selectedCompanies={selectedCompanies}
                 onCompanySelectionChange={setSelectedCompanies}
                 detailedData={detailedData}
@@ -923,6 +931,13 @@ export default function Home() {
           </section>
         )}
       </main>
+      
+      {/* RAG Chatbot */}
+      <RAGChatbot
+        isVisible={chatbotVisible}
+        onToggle={() => setChatbotVisible(!chatbotVisible)}
+        comparisonData={comparables}
+      />
     </div>
   );
 }

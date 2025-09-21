@@ -5,15 +5,15 @@ import os
 from dotenv import load_dotenv
 
 # Import routers
-from routes import analysis, companies, comparison, market, health
+from routes import analysis, companies, comparison, market, health, rag
 
 # Load environment variables
 load_dotenv()
 
 # Create FastAPI application
 app = FastAPI(
-    title="Company Comparison API",
-    description="API for comparing company financial data and finding comparable companies",
+    title="AI Analyst for Startup and Enterprise Evaluation API",
+    description="API for AI-driven evaluation of startups and enterprises: analyze companies, find comparable peers, fetch financial metrics, and chat via RAG",
     version="1.0.0"
 )
 
@@ -32,6 +32,7 @@ app.include_router(analysis.router)
 app.include_router(companies.router)
 app.include_router(comparison.router)
 app.include_router(market.router)
+app.include_router(rag.router)
 
 # Run the application
 if __name__ == "__main__":

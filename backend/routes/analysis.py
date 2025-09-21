@@ -250,7 +250,8 @@ async def find_comparables_from_input(
                 "id": company_id,
                 "name": target_company_name,
                 "website": target_company_website,
-                "description": company_description
+                "description": company_description,
+                "ticker": ticker
             },
             "comparable_companies": comparable_companies,
             "filters_applied": filters,
@@ -456,7 +457,8 @@ async def find_comparables_with_financials(
                 "id": None,
                 "name": target_company_name,
                 "website": target_company_website,
-                "description": company_description
+                "description": company_description,
+                "ticker": ticker
             },
             "comparable_companies": comparable_companies,
             "financial_data_included": include_financials,

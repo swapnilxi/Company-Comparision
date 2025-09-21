@@ -1,11 +1,13 @@
 # FastAPI Routes Structure
 
-This directory contains the organized route files for the Company Comparison API, following FastAPI best practices for route organization.
+This directory contains the organized route files for the AI Analyst for Startup and Enterprise Evaluation API, following FastAPI best practices for route organization.
 
 ## Route Organization
 
 ### `/routes/analysis.py`
+
 Contains all analysis-related endpoints:
+
 - `POST /api/find-comparables` - Main endpoint for finding comparable companies
 - `POST /api/analyze` - Analyze a company based on name and website
 - `POST /api/comparable` - Find comparable companies based on description
@@ -14,7 +16,9 @@ Contains all analysis-related endpoints:
 - `GET /api/refinement-suggestions` - Get available refinement options
 
 ### `/routes/companies.py`
+
 Contains company CRUD operations:
+
 - `GET /api/companies` - Get all companies
 - `GET /api/companies/{company_id}` - Get a specific company
 - `POST /api/companies` - Create a new company
@@ -22,18 +26,24 @@ Contains company CRUD operations:
 - `DELETE /api/companies/{company_id}` - Delete a company
 
 ### `/routes/comparison.py`
+
 Contains comparison operations:
+
 - `GET /api/compare` - Compare multiple companies
 
 ### `/routes/market.py`
+
 Contains market data endpoints (FMP API integration):
+
 - `GET /api/market/quote/{ticker}` - Get real-time quote for a ticker
 - `GET /api/market/price/{ticker}` - Get real-time price for a ticker
 - `GET /api/market/quotes` - Get real-time quotes for multiple tickers
 - `GET /api/market/profile/{ticker}` - Get company profile
 
 ### `/routes/health.py`
+
 Contains basic health and root endpoints:
+
 - `GET /` - Root endpoint
 - `GET /health` - Health check endpoint
 
@@ -60,6 +70,7 @@ To add new routes:
 4. Import and include the router in `main.py`
 
 Example:
+
 ```python
 # routes/new_feature.py
 from fastapi import APIRouter
@@ -72,14 +83,8 @@ async def get_new_feature():
 ```
 
 Then in `main.py`:
+
 ```python
 from routes import new_feature
 app.include_router(new_feature.router)
 ```
-
-
-
-
-
-
-

@@ -11,7 +11,7 @@ class FMPAPI:
     
     def __init__(self):
         self.api_key = os.getenv("FMP_API_KEY")
-        self.api_url = "https://financialmodelingprep.com/api/v3"
+        self.api_url = "https://financialmodelingprep.com/stable/"
         
         if not self.api_key:
             print("Warning: FMP API key not found. Financial metrics will not be available.")
@@ -38,15 +38,15 @@ class FMPAPI:
     
     def get_company_profile(self, ticker: str) -> Dict[str, Any]:
         """Get company profile and key financial metrics"""
-        return self._make_request(f"profile/{ticker}")
+        return self._make_request("search-symbol", {"query": ticker})
     
     def get_company_quote(self, ticker: str) -> Dict[str, Any]:
         """Get real-time stock quote"""
-        return self._make_request(f"quote/{ticker}")
+        return self._make_request("quote", {"symbol": ticker})
     
     def get_realtime_price(self, ticker: str) -> Dict[str, Any]:
         """Get lightweight real-time price (price and volume)"""
-        return self._make_request(f"quote-short/{ticker}")
+        return self._make_request("quote-short", {"symbol": ticker})
     
     def get_realtime_prices(self, tickers: List[str]) -> Any:
         """Get real-time quotes for multiple tickers"""
@@ -54,23 +54,23 @@ class FMPAPI:
             return []
         tickers_param = ",".join(tickers)
         # FMP supports comma-separated tickers in quote endpoint
-        return self._make_request(f"quote/{tickers_param}")
+        return self._make_request("quote", {"symbol": tickers_param})
     
-    def get_financial_ratios(self, ticker: str) -> Dict[str, Any]:
+    def get_financial_ratio(self, ticker: str) -> Dict[str, Any]:
         """Get key financial ratios"""
-        return self._make_request(f"ratios/{ticker}")
+        return self._make_request("ratios", {"symbol": ticker})
     
     def get_income_statement(self, ticker: str, period: str = "annual") -> Dict[str, Any]:
         """Get income statement data"""
-        return self._make_request(f"income-statement/{ticker}", {"period": period})
+        return self._make_request("income-statement", {"symbol": ticker, "period": period})
     
     def get_balance_sheet(self, ticker: str, period: str = "annual") -> Dict[str, Any]:
         """Get balance sheet data"""
-        return self._make_request(f"balance-sheet-statement/{ticker}", {"period": period})
+        return self._make_request("balance-sheet-statement", {"symbol": ticker, "period": period})
     
     def get_cash_flow(self, ticker: str, period: str = "annual") -> Dict[str, Any]:
         """Get cash flow statement data"""
-        return self._make_request(f"cash-flow-statement/{ticker}", {"period": period})
+        return self._make_request("cash-flow-statement", {"symbol": ticker, "period": period})
     
     def get_key_metrics(self, ticker: str) -> Dict[str, Any]:
         """Get key financial metrics for a company"""
@@ -86,7 +86,7 @@ class FMPAPI:
                 quote = quote[0]
             
             # Get financial ratios
-            ratios = self.get_financial_ratios(ticker)
+            ratios = self.get_financial_ratio(ticker)
             if isinstance(ratios, list) and len(ratios) > 0:
                 ratios = ratios[0]
             

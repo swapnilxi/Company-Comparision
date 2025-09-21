@@ -1,6 +1,6 @@
-Company Comparables Finder
+AI Analyst for Startup and Enterprise Evaluation
 Overview
-Create a next js and fastapi prototype application that identifies comparable public companies based on a target company's name and website.
+A Next.js + FastAPI application that evaluates startups and enterprises: analyzes a target company, identifies comparable public peers, and can enrich with financial metrics.
 
 Core Requirements
 Input Interface
@@ -32,5 +32,3 @@ Add user feedback mechanism to refine search results
 Allow users to specify areas for improvement in the initial results
 Implement iterative search functionality to generate additional companies based on user feedback
 Consider adding filters for company size, geography, or specific business characteristics
-
-

@@ -23,6 +23,7 @@ interface CompanyComparisonTableProps {
     website?: string;
     description?: string;
   };
+  targetTicker?: string;
   selectedCompanies: Set<string>;
   onCompanySelectionChange: (selected: Set<string>) => void;
   detailedData?: Record<string, any> | null;
@@ -33,6 +34,7 @@ interface CompanyComparisonTableProps {
 const EnhancedComparisonTable: React.FC<CompanyComparisonTableProps> = ({
   comparableCompanies,
   targetCompany,
+  targetTicker,
   selectedCompanies,
   onCompanySelectionChange,
   detailedData: propDetailedData,
@@ -123,7 +125,7 @@ const EnhancedComparisonTable: React.FC<CompanyComparisonTableProps> = ({
     if (targetCompany && showTargetCompany) {
       companies.push({
         name: targetCompany.name || 'Target Company',
-        ticker: 'TARGET',
+        ticker: targetTicker || 'TARGET',
         type: 'target',
         description: targetCompany.description || '',
         website: targetCompany.website || '',

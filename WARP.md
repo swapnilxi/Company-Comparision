@@ -4,13 +4,14 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Project Overview
 
-This is a Company Comparables Finder application that identifies comparable public companies based on a target company's name and website. It uses AI-powered analysis (DeepSeek API) to generate company descriptions and find comparables, with optional financial metrics integration (FMP API).
+This repository contains "AI Analyst for Startup and Enterprise Evaluation" — an application that evaluates startups and enterprises using AI. It analyzes a target company, identifies comparable public peers, and can enrich results with financial metrics. It uses AI-powered analysis (DeepSeek API) and optional financial data via FMP API, plus a RAG chatbot for interactive insights.
 
 **Architecture**: Full-stack application with Python FastAPI backend and Next.js frontend
 
 ## Common Development Commands
 
 ### Backend (FastAPI)
+
 ```bash
 # Navigate to backend directory
 cd backend
@@ -35,6 +36,7 @@ python -c "from test_deepseek_api import test_analyze_company; test_analyze_comp
 ```
 
 ### Frontend (Next.js)
+
 ```bash
 # Navigate to frontend directory
 cd frontend
@@ -56,18 +58,20 @@ npm run lint
 ```
 
 ### Full Application
+
 ```bash
 # Start both services (run in separate terminals)
 # Terminal 1 - Backend
 cd backend && python main.py
 
-# Terminal 2 - Frontend  
+# Terminal 2 - Frontend
 cd frontend && npm run dev
 ```
 
 ## High-Level Architecture
 
 ### Backend Structure (`/backend`)
+
 - **FastAPI Application** (`main.py`): Main app entry point with CORS middleware, router includes
 - **Route Modules** (`/routes`): Modular API endpoints organized by feature
   - `health.py`: System health checks
@@ -80,6 +84,7 @@ cd frontend && npm run dev
 - **Database Layer** (`database.py`): Data persistence logic
 
 ### Frontend Structure (`/frontend`)
+
 - **Next.js 15 App Router**: Modern React framework with TypeScript
 - **Main Page** (`/src/app/page.tsx`): Single-page interface with company input forms and results display
 - **Components** (`/src/components`): Reusable UI components (CompanyCard, ComparisonChart)
@@ -87,19 +92,23 @@ cd frontend && npm run dev
 - **Styling**: TailwindCSS v4 with dark mode support
 
 ### API Integration Flow
+
 1. **Company Analysis**: User input (name/website/ticker) → DeepSeek API → Structured company description
 2. **Comparable Finding**: Company description → DeepSeek API → List of comparable public companies
 3. **Financial Enhancement**: Company tickers → FMP API → Financial metrics (market cap, revenue, EBITDA)
 
 ### Key Features
+
 - **Flexible Input**: Supports company name, website URL, stock ticker, or internal company ID
-- **AI-Powered Analysis**: Uses DeepSeek API for intelligent company analysis and comparable identification  
+- **AI-Powered Analysis**: Uses DeepSeek API for intelligent company analysis and comparable identification
 - **Financial Integration**: Optional FMP API integration for real-time financial metrics
 - **Interactive Refinement**: User feedback system to improve search results
 - **Multiple Search Modes**: Analysis-only, basic comparison, or comparison with financial data
 
 ### Environment Configuration
+
 Backend requires environment variables in `/backend/.env`:
+
 - `DEEPSEEK_API_KEY`: Required for AI-powered company analysis
 - `FMP_API_KEY`: Required for financial metrics (Extension 1)
 - `API_HOST`, `API_PORT`, `DEBUG`: FastAPI server configuration
@@ -107,6 +116,7 @@ Backend requires environment variables in `/backend/.env`:
 Frontend API base URL configured via `NEXT_PUBLIC_API_BASE` (defaults to `http://localhost:8000`)
 
 ### Core API Endpoints
+
 - `POST /api/analyze`: Generate comprehensive company description
 - `POST /api/find-comparables`: Main endpoint - find comparable companies (flexible input)
 - `POST /api/comparables-with-financials`: Enhanced endpoint with financial metrics
@@ -114,13 +124,16 @@ Frontend API base URL configured via `NEXT_PUBLIC_API_BASE` (defaults to `http:/
 - Standard CRUD operations for company management
 
 ### Data Flow Patterns
+
 The application supports multiple input patterns with intelligent fallbacks:
+
 1. **Primary**: Stock ticker → auto-populate company data → analysis/comparison
 2. **Standard**: Company name + website → structured analysis → comparable search
 3. **Flexible**: Any combination of name, website, company ID → best-effort matching
 4. **Refinement**: Previous results + user feedback → improved comparable suggestions
 
 ### External Dependencies
+
 - **DeepSeek API**: Company analysis and comparable finding (required)
 - **FMP API**: Real-time financial data and stock quotes (optional for Extension 1)
 - **CORS**: Configured for localhost:3000 frontend integration

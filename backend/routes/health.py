@@ -6,7 +6,7 @@ router = APIRouter(tags=["health"])
 @router.get("/")
 async def read_root():
     """Root endpoint"""
-    return {"message": "Welcome to the Company Comparison API"}
+    return {"message": "Welcome to the AI Analyst for Startup and Enterprise Evaluation API"}
 
 @router.get("/health")
 async def health_check():

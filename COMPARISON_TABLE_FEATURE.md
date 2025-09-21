@@ -1,4 +1,4 @@
-# Company Comparison Table Feature
+# AI Analyst: Comparison Table Feature
 
 ## Overview
 
