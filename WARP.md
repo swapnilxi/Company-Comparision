@@ -1,141 +1,94 @@
-# WARP.md
+# WARP quick guide (expanded)
 
-This file provides guidance to WARP (warp.dev) when working with code in this repository.
+Use the root README for full details. This file is a focused, copy‑pasteable quickstart for Warp CLI and LLMs.
 
-## Project Overview
+## What this is
 
-This repository contains "AI Analyst for Startup and Enterprise Evaluation" — an application that evaluates startups and enterprises using AI. It analyzes a target company, identifies comparable public peers, and can enrich results with financial metrics. It uses AI-powered analysis (DeepSeek API) and optional financial data via FMP API, plus a RAG chatbot for interactive insights.
+- Backend: FastAPI API in `backend/` (analysis, comparables, FMP metrics, simple RAG)
+- Frontend: Next.js app in `frontend/` (forms, results, comparison table, chatbot)
+- LLM providers: DeepSeek (current), Gemini (planned)
 
-**Architecture**: Full-stack application with Python FastAPI backend and Next.js frontend
+## Prereqs
 
-## Common Development Commands
+- Python 3.10+
+- Node.js 18+
 
-### Backend (FastAPI)
+## Setup
 
-```bash
-# Navigate to backend directory
-cd backend
+```zsh
+# Backend deps
+pip install -r backend/requirements.txt
 
-# Install dependencies
-pip install -r requirements.txt
+# Env (never commit .env)
+cp backend/.env.example backend/.env
+# Fill: DEEPSEEK_API_KEY, (optional) GEMINI_API_KEY, FMP_API_KEY
 
-# Run development server (with hot reload)
-python main.py
-
-# Run production server
-uvicorn main:app --host 0.0.0.0 --port 8000
-
-# Test API endpoints
-python ../test_deepseek_api.py
-
-# Check API health
-curl http://localhost:8000/health
-
-# Run a single API test function (modify test_deepseek_api.py as needed)
-python -c "from test_deepseek_api import test_analyze_company; test_analyze_company()"
+# Frontend deps
+cd frontend && npm install
 ```
 
-### Frontend (Next.js)
+## Run (two panes)
 
-```bash
-# Navigate to frontend directory
-cd frontend
+```zsh
+# Pane 1 (API)
+python backend/main.py  # http://localhost:8000
 
-# Install dependencies
-npm install
+# Alternative
+# uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
-# Run development server (with hot reload and turbopack)
-npm run dev
+# Pane 2 (Web)
+npm run dev --prefix frontend  # http://localhost:3000
 
-# Build for production
-npm run build
-
-# Start production server
-npm run start
-
-# Lint code
-npm run lint
+# If backend URL differs:
+# export NEXT_PUBLIC_API_BASE="http://localhost:8000"
 ```
 
-### Full Application
+## Quick API checks
 
-```bash
-# Start both services (run in separate terminals)
-# Terminal 1 - Backend
-cd backend && python main.py
+```zsh
+# Health
+curl -s http://localhost:8000/health
 
-# Terminal 2 - Frontend
-cd frontend && npm run dev
+# Analyze company (name + website)
+curl -sX POST http://localhost:8000/api/analyze \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Acme AI","website":"https://example.com"}'
+
+# Find comparables (flexible input)
+curl -sX POST http://localhost:8000/api/find-comparables \
+  -H 'Content-Type: application/json' \
+  -d '{"company_name":"Acme AI","count":10}'
+
+# Comparables with financials (requires FMP_API_KEY)
+curl -sX POST http://localhost:8000/api/comparables-with-financials \
+  -H 'Content-Type: application/json' \
+  -d '{"company_name":"Acme AI","include_financials":true,"count":10}'
 ```
 
-## High-Level Architecture
+Endpoints (brief): `/api/analyze`, `/api/find-comparables`, `/api/comparables-with-financials`, `/api/refine-comparables`, `/api/filter-options`, `/api/market/profile/{ticker}`. See `backend/API_DOCUMENTATION.md` for full details.
 
-### Backend Structure (`/backend`)
+## Testing shortcuts
 
-- **FastAPI Application** (`main.py`): Main app entry point with CORS middleware, router includes
-- **Route Modules** (`/routes`): Modular API endpoints organized by feature
-  - `health.py`: System health checks
-  - `analysis.py`: Company analysis endpoints
-  - `companies.py`: CRUD operations for company data
-  - `comparison.py`: Company comparison functionality
-  - `market.py`: Market data and financial metrics
-- **Data Models** (`models.py`): Pydantic models for request/response validation and data structures
-- **External APIs** (`deepseek_api.py`, `fmp_api.py`): Client classes for third-party service integration
-- **Database Layer** (`database.py`): Data persistence logic
+```zsh
+# From repo root
+python backend/test_deepseek_api.py
+python backend/test_rag.py
+```
 
-### Frontend Structure (`/frontend`)
+## Common env
 
-- **Next.js 15 App Router**: Modern React framework with TypeScript
-- **Main Page** (`/src/app/page.tsx`): Single-page interface with company input forms and results display
-- **Components** (`/src/components`): Reusable UI components (CompanyCard, ComparisonChart)
-- **Utilities** (`/src/utils`): Helper functions and analytics utils
-- **Styling**: TailwindCSS v4 with dark mode support
+- Backend `.env`: `DEEPSEEK_API_KEY`, `GEMINI_API_KEY` (optional), `FMP_API_KEY`, `DEEPSEEK_API_URL?`, `API_HOST?`, `API_PORT?`, `DEBUG?`
+- Frontend: `NEXT_PUBLIC_API_BASE` (default http://localhost:8000)
 
-### API Integration Flow
+## Troubleshooting
 
-1. **Company Analysis**: User input (name/website/ticker) → DeepSeek API → Structured company description
-2. **Comparable Finding**: Company description → DeepSeek API → List of comparable public companies
-3. **Financial Enhancement**: Company tickers → FMP API → Financial metrics (market cap, revenue, EBITDA)
+- 401/403 from API calls: check API keys in `backend/.env` and that backend restarted
+- 5xx on analysis: missing/invalid DEEPSEEK_API_KEY or upstream error; inspect backend logs
+- No financials: ensure `FMP_API_KEY` is set
+- CORS in browser: backend allows http://localhost:3000 by default (see `backend/main.py`)
+- Port conflicts: change `API_PORT` or pass `--port` to uvicorn; update `NEXT_PUBLIC_API_BASE`
 
-### Key Features
+## Provider notes
 
-- **Flexible Input**: Supports company name, website URL, stock ticker, or internal company ID
-- **AI-Powered Analysis**: Uses DeepSeek API for intelligent company analysis and comparable identification
-- **Financial Integration**: Optional FMP API integration for real-time financial metrics
-- **Interactive Refinement**: User feedback system to improve search results
-- **Multiple Search Modes**: Analysis-only, basic comparison, or comparison with financial data
-
-### Environment Configuration
-
-Backend requires environment variables in `/backend/.env`:
-
-- `DEEPSEEK_API_KEY`: Required for AI-powered company analysis
-- `FMP_API_KEY`: Required for financial metrics (Extension 1)
-- `API_HOST`, `API_PORT`, `DEBUG`: FastAPI server configuration
-
-Frontend API base URL configured via `NEXT_PUBLIC_API_BASE` (defaults to `http://localhost:8000`)
-
-### Core API Endpoints
-
-- `POST /api/analyze`: Generate comprehensive company description
-- `POST /api/find-comparables`: Main endpoint - find comparable companies (flexible input)
-- `POST /api/comparables-with-financials`: Enhanced endpoint with financial metrics
-- `POST /api/refine-comparables`: Interactive search refinement
-- Standard CRUD operations for company management
-
-### Data Flow Patterns
-
-The application supports multiple input patterns with intelligent fallbacks:
-
-1. **Primary**: Stock ticker → auto-populate company data → analysis/comparison
-2. **Standard**: Company name + website → structured analysis → comparable search
-3. **Flexible**: Any combination of name, website, company ID → best-effort matching
-4. **Refinement**: Previous results + user feedback → improved comparable suggestions
-
-### External Dependencies
-
-- **DeepSeek API**: Company analysis and comparable finding (required)
-- **FMP API**: Real-time financial data and stock quotes (optional for Extension 1)
-- **CORS**: Configured for localhost:3000 frontend integration
-
-This architecture enables rapid development of company analysis features while maintaining clear separation between AI-powered analysis, financial data integration, and user interface components.
+- DeepSeek is wired today (`backend/deepseek_api.py`)
+- Gemini support is planned; keep `GEMINI_API_KEY` ready (no runtime toggle yet)

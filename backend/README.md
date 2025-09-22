@@ -1,34 +1,28 @@
-AI Analyst for Startup and Enterprise Evaluation
+Backend (FastAPI)
 Overview
-A Next.js + FastAPI application that evaluates startups and enterprises: analyzes a target company, identifies comparable public peers, and can enrich with financial metrics.
+Implements the API for analysis, comparable discovery, financial enrichment (FMP), and a simple RAG assistant.
 
-Core Requirements
-Input Interface
-Company Name: Text input field for target company name
-Company Website: URL input field for company website
-Core Functionality
-Company Analysis: Generate a comprehensive company description using the provided company name and website
-Comparable Company Identification: Based on the generated description, identify 7-10 comparable public companies
-Results Display: Present findings in a clear, organized format
-Output Requirements
-For each comparable company identified, display:
+Docs
 
-Company Name: Full legal or common business name
-Stock Ticker: Exchange symbol (e.g., AAPL, GOOGL)
-Match Rationale: Explanation of why this company is considered comparable (industry, business model, size, market focus, etc.)
-It would be probably the best to use DeepSeek API to get the comparable companies data.
+- Root usage and setup: see ../../README.md
+- Full API reference: ./API_DOCUMENTATION.md
 
-What We Will Provide You
-Your own DeepSeek API key
-Help and guidance whenever needed - just message or email us!
-Task Extensions
-Extension 1: Financial Metrics Integration
+Run
 
-Integrate FMP API to display key financial data
-Show market cap, EBITDA, revenue for each comparable company
-Extension 2: Interactive Refinement
+- pip install -r requirements.txt
+- python main.py # http://localhost:8000
 
-Add user feedback mechanism to refine search results
-Allow users to specify areas for improvement in the initial results
-Implement iterative search functionality to generate additional companies based on user feedback
-Consider adding filters for company size, geography, or specific business characteristics
+Env (.env)
+
+- DEEPSEEK_API_KEY=... (current provider)
+- GEMINI_API_KEY=... (planned provider)
+- FMP_API_KEY=...
+- API_HOST=0.0.0.0 (optional)
+- API_PORT=8000 (optional)
+- DEBUG=true (optional)
+
+Key files
+
+- routes/: modular endpoints (analysis, market, companies, comparison, rag)
+- deepseek_api.py, fmp_api.py: external clients
+- rag_service.py: minimal RAG engine (sentence-transformers + FAISS)

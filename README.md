@@ -1,113 +1,111 @@
-# AI Analyst for Startup and Enterprise Evaluation
+# AI Analyst: Company Comparison (FastAPI + Next.js)
 
-An end-to-end AI application that evaluates startups and enterprises, finds comparable public peers, enriches with financial metrics, and lets you interact with results via a RAG chatbot.
+Analyze a target company, find 7–10 comparable public peers, enrich with financials (FMP), and chat over results with a simple RAG assistant.
 
-## Highlights
+## TL;DR for LLMs / Wrap CLI
 
-- AI-driven analysis of a target company (name/website/ticker)
-- Comparable company discovery (7–10 peers) with rationale
-- Optional financial enrichment via FMP (market cap, revenue, EBITDA, ratios)
-- Interactive refinement loop and filterable results
-- RAG chatbot for follow-up questions and insights
-- Full-stack: FastAPI backend + Next.js frontend
+```yaml
+project:
+  name: company-comparison-ai
+  stack: fastapi (python) + next.js (typescript)
+  key-dirs:
+    backend: fastapi app, routes, models, api clients
+    frontend: next.js app with ui components
+  llm-providers:
+    - deepseek (current)
+    - gemini (planned)
+  env:
+    backend:
+      [
+        DEEPSEEK_API_KEY,
+        GEMINI_API_KEY,
+        FMP_API_KEY,
+        API_HOST?,
+        API_PORT?,
+        DEBUG?,
+      ]
+    frontend: [NEXT_PUBLIC_API_BASE]
+  run:
+    - backend: pip install -r backend/requirements.txt && python backend/main.py
+    - frontend: cd frontend && npm install && npm run dev
+docs:
+  api: backend/API_DOCUMENTATION.md
+```
 
-## Architecture
+## Features
 
-- Backend: FastAPI (Python)
-  - DeepSeek API client for analysis and comparables
-  - FMP API client for market/financial data
-  - RAG service using sentence-transformers + FAISS
-  - Modular route structure under `backend/routes`
-- Frontend: Next.js (App Router, TypeScript)
-  - Company input, results view, comparison table, filters
-  - RAG chatbot UI component
-  - TailwindCSS for styling
+- Input: company name/website or ticker (ID supported in demo DB)
+- Output: 7–10 comparable public companies with rationale
+- Optional financial metrics via FMP: market cap, revenue, EBITDA, ratios
+- Comparison table + basic filters (size, geography, characteristics, sector)
+- RAG chatbot for contextual Q&A over analysis/comparison
 
-Directory overview:
+## Repo Layout
 
-- `/backend` — FastAPI app, routes, models, external API clients
-- `/frontend` — Next.js app with components and pages
+- `backend/` FastAPI app, modular routes, models, DeepSeek + FMP clients, basic RAG
+- `frontend/` Next.js (App Router, TS), UI components and pages
 
-## Key Features
+## Quickstart
 
-- Flexible input:
-  - Company name + website
-  - Ticker symbol (auto-fetch profile)
-  - Company ID from DB (sample)
-- Outputs:
-  - Target company analysis (description, highlights)
-  - 7–10 comparable public companies with name, ticker, and rationale
-  - Optional detailed financials and ratios (via FMP)
-- Comparison Table:
-  - Select companies to compare
-  - Toggle target company inclusion
-  - Request detailed metrics and ratios
-  - Filter by size/geography/characteristics/sectors (simplified demo)
-- RAG Chatbot:
-  - Ask questions about results and metrics
-  - Gets smarter with vector search over analysis and comparison context
+Prereqs: Python 3.10+, Node.js 18+
 
-## Getting Started
+Backend
 
-Prereqs:
+- Create env: copy `backend/.env.example` to `backend/.env` and fill keys
+- Install deps: pip install -r backend/requirements.txt
+- Run API: python backend/main.py (defaults to http://localhost:8000)
 
-- Python 3.10+
-- Node.js 18+
+Frontend
 
-### 1) Backend
+- cd frontend && npm install
+- npm run dev (defaults to http://localhost:3000)
+- Configure API base (optional): set `NEXT_PUBLIC_API_BASE` if backend URL differs
 
-1. Move to backend folder and install dependencies
-   - pip install -r backend/requirements.txt
-2. Create `backend/.env` with:
-   - DEEPSEEK_API_KEY=...
-   - FMP_API_KEY=...
-   - API_HOST=0.0.0.0 (optional)
-   - API_PORT=8000 (optional)
-   - DEBUG=true (optional)
-3. Run the API
-   - python backend/main.py
+## Environment Variables
 
-### 2) Frontend
+Backend (`backend/.env`)
 
-1. Move to frontend folder and install deps
-   - cd frontend
-   - npm install
-2. Start dev server
-   - npm run dev
-3. By default, the frontend requests `http://localhost:8000`. To change, set `NEXT_PUBLIC_API_BASE` in env.
+- DEEPSEEK_API_KEY=...
+- GEMINI_API_KEY=... # planned provider; see note below
+- FMP_API_KEY=...
+- DEEPSEEK_API_URL=https://api.deepseek.com/v1 # optional
+- API_HOST=0.0.0.0 # optional
+- API_PORT=8000 # optional
+- DEBUG=true # optional
 
-## Core API Endpoints (brief)
+Frontend
 
-- POST `/api/analyze` — Analyze target company (name+website)
-- POST `/api/find-comparables` — Flexible entry (id/name/website/ticker) → comparables
-- POST `/api/comparables-with-financials` — Comparables + financials
-- POST `/api/refine-comparables` — Interactive refinement
-- GET `/api/filter-options` — Filter presets
-- GET `/api/market/profile/{ticker}` — Company profile via FMP
-- GET `/health` — Health check
+- NEXT_PUBLIC_API_BASE=http://localhost:8000
 
-Full details in `backend/API_DOCUMENTATION.md`.
+Provider notes
 
-## Configuration Notes
+- Current implementation uses DeepSeek (`backend/deepseek_api.py`).
+- Gemini support is planned; `GEMINI_API_KEY` is reserved for that integration.
 
-- CORS is enabled for `http://localhost:3000` by default (see `backend/main.py`).
-- RAG embeddings use `sentence-transformers`; FAISS is used for similarity search.
-- External API clients are in `backend/deepseek_api.py` and `backend/fmp_api.py`.
+## API (brief)
 
-## Development Tips
+- POST `/api/analyze` — analyze a company (name + website)
+- POST `/api/find-comparables` — flexible input → comparable companies
+- POST `/api/comparables-with-financials` — comparables + financial metrics
+- POST `/api/refine-comparables` — refine results via feedback
+- GET `/api/filter-options` — filter presets for UI
+- GET `/api/market/profile/{ticker}` — profile via FMP
+- GET `/health` — health check
 
-- Start backend and frontend in separate terminals.
-- Use the Results View to pick companies; switch to Comparison Table to compare.
-- Click "Get Detailed Data" to fetch richer metrics.
-- Open the chatbot to query the analysis and comparison context.
+Details: see `backend/API_DOCUMENTATION.md`.
+
+## Dev Notes
+
+- CORS allows http://localhost:3000 (see `backend/main.py`).
+- RAG uses sentence-transformers + FAISS (simple, optional path).
+- Tests: `backend/test_deepseek_api.py`, `backend/test_rag.py`.
 
 ## Roadmap
 
-- Auth + rate limiting
-- Persisted vector store and history
-- Export reports (PDF/CSV)
-- More granular filters and sector tagging
+- Switchable LLM provider (DeepSeek | Gemini)
+- Persisted vector store and conversation history
+- Export (CSV/PDF) and richer filters
 
 ## License
 
-MIT or project-specific; adjust as needed.
+MIT (update as needed)
